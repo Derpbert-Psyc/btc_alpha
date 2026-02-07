@@ -9,7 +9,8 @@ from btc_alpha_phase3 import (
     BacktestRunner,
 )
 
-DATA = Path("btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet")
+DATA = str(Path(__file__).resolve().parent / "historic_data" / "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet")
+
 
 def run_once(preset: FrictionPreset):
     raw = load_data(DATA)
