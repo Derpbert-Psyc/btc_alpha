@@ -10,10 +10,10 @@ env/
 ENV/
 
 # Data files (exclude heavy datasets)
-*.parquet
 data/local/
 data/raw/
 data/cache/
+historic_data/
 
 # Allow committed sample datasets if desired
 !data/sample/

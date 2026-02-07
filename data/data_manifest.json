@@ -1,0 +1,17 @@
+{
+  "release_tag": "data-v1",
+  "assets": [
+    {
+      "name": "btcusdt_binance_spot_1m_2018_to_2026.parquet",
+      "destination": "historic_data/btcusdt_binance_spot_1m_2018_to_2026.parquet",
+      "sha256": "PUT_SHA256_HERE",
+      "bytes": 0
+    },
+    {
+      "name": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
+      "destination": "historic_data/btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
+      "sha256": "PUT_SHA256_HERE",
+      "bytes": 0
+    }
+  ]
+}
