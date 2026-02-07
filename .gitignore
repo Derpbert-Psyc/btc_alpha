@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Data files (exclude heavy datasets)
+*.parquet
+data/local/
+data/raw/
+data/cache/
+
+# Allow committed sample datasets if desired
+!data/sample/
+!data/sample/**
+
+# Logs and runtime
+*.log
+logs/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Testing / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Env files
+.env
+.env.*

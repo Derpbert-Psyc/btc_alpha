@@ -1,0 +1,44 @@
+(.venv) PS C:\Users\raoul\Desktop\btc_alpha> python .\run_phase3_local.py
+  Progress: 100000/570191 (17.5%)
+  Progress: 200000/570191 (35.1%)
+  Progress: 300000/570191 (52.6%)
+  Progress: 400000/570191 (70.2%)
+  Progress: 500000/570191 (87.7%)
+  Progress: 100000/570191 (17.5%)
+  Progress: 200000/570191 (35.1%)
+  Progress: 300000/570191 (52.6%)
+  Progress: 400000/570191 (70.2%)
+  Progress: 500000/570191 (87.7%)
+
+Preset: CONSERVATIVE
+Trades: 7725
+Net PnL: -7066.45 USD
+Max DD:  4966.40 USD
+Hashes:
+  trades:  3fad1d088cc85ae261ad4479292e7b58d4223e574a3d66f6a1e7c62ac54acc98
+  equity:  95d6f57ba248302c74e454189fd577ba98c8669b1d0786bce374322c5d787df8
+  metrics: 6995d3d25a3cc106d14081bc4aed59d3d68cd4303a00edeca8b5b7a4aacdf74c
+  config:  94be7ba6f1289555c0f56af2904ab3c09a92e159645064a1ab003a7c624ce36b
+Determinism rerun match: True
+  Progress: 100000/570191 (17.5%)
+  Progress: 200000/570191 (35.1%)
+  Progress: 300000/570191 (52.6%)
+  Progress: 400000/570191 (70.2%)
+  Progress: 500000/570191 (87.7%)
+  Progress: 100000/570191 (17.5%)
+  Progress: 200000/570191 (35.1%)
+  Progress: 300000/570191 (52.6%)
+  Progress: 400000/570191 (70.2%)
+  Progress: 500000/570191 (87.7%)
+
+Preset: PUNITIVE
+Trades: 7725
+Net PnL: -14364.69 USD
+Max DD:  9703.43 USD
+Hashes:
+  trades:  d1e45550547e94514bf86c41f13f6f1b384b7b3727c2cd3754996962274e5de5
+  equity:  81ef9e738aa9f20dda86dca7b079e6d9cf0e9e310f0d61db9e3f7bd76e2b5c01
+  metrics: 3d0eb095b28d24a837224c66581948f0a006ad8fc43850aefe4866de99f44589
+  config:  f19662e4e71c18b8f8b0db2591583f128b4101c9234b5178d5a70a9b4fedeca7
+Determinism rerun match: True
+(.venv) PS C:\Users\raoul\Desktop\btc_alpha>
