@@ -1,0 +1,71 @@
+{
+  "format_version": "synthetic_manifest_v1",
+  "timestamp_convention": "CLOSE_TIME epoch seconds (minute aligned)",
+  "paths_are_relative_to": "C:\\Users\\raoul\\Desktop\\btc_alpha\\synthetic_data",
+  "primary_ok_file": "synthetic_ok_1m.parquet",
+  "cases": [
+    {
+      "file": "synthetic_ok_1m.parquet",
+      "expect": "PASS",
+      "gap_policy": "HALT",
+      "expected_error_contains": null,
+      "notes": "Contiguous 1m close_time seconds, minute-aligned, valid OHLC, in-bounds prices, positive volume."
+    },
+    {
+      "file": "synthetic_open_time_ms.parquet",
+      "expect": "PASS",
+      "gap_policy": "HALT",
+      "expected_error_contains": null,
+      "notes": "Uses open_time in milliseconds only. Loader should ms-normalize then +60s to close_time. Should remain contiguous and minute-aligned."
+    },
+    {
+      "file": "bad_gap.parquet",
+      "expect": "FAIL",
+      "gap_policy": "HALT",
+      "expected_error_contains": "Gap detected",
+      "notes": "One missing minute in the middle. Should raise GapError under HALT."
+    },
+    {
+      "file": "bad_duplicate.parquet",
+      "expect": "FAIL",
+      "gap_policy": "HALT",
+      "expected_error_contains": "Duplicate timestamp detected",
+      "notes": "Duplicate close_time. Should raise DataIntegrityError under HALT."
+    },
+    {
+      "file": "bad_out_of_order.parquet",
+      "expect": "FAIL",
+      "gap_policy": "HALT",
+      "expected_error_contains": "Out-of-order timestamp",
+      "notes": "Two adjacent rows swapped. Validator refuses to sort. Should raise DataIntegrityError under HALT."
+    },
+    {
+      "file": "bad_ts_alignment.parquet",
+      "expect": "FAIL",
+      "gap_policy": "HALT",
+      "expected_error_contains": "not aligned to minute boundary",
+      "notes": "One close_time has +30s, so ts % 60 != 0. Should raise DataIntegrityError under HALT."
+    },
+    {
+      "file": "bad_ohlc.parquet",
+      "expect": "FAIL",
+      "gap_policy": "HALT",
+      "expected_error_contains": "OHLC error",
+      "notes": "One row has high < open/close. Should raise OHLCError under HALT."
+    },
+    {
+      "file": "bad_price_bounds.parquet",
+      "expect": "FAIL",
+      "gap_policy": "HALT",
+      "expected_error_contains": "Price out of bounds",
+      "notes": "One row has low=$99.99. Should raise DataIntegrityError under HALT."
+    }
+  ],
+  "how_to_use_phase3": {
+    "call_path": [
+      "raw = load_data(path)",
+      "candles, report = validate_candles(raw, GapPolicy.HALT)",
+      "assert report.is_valid"
+    ]
+  }
+}
