@@ -4,13 +4,13 @@
     {
       "name": "btcusdt_binance_spot_1m_2018_to_2026.parquet",
       "destination": "historic_data/btcusdt_binance_spot_1m_2018_to_2026.parquet",
-      "sha256": "PUT_SHA256_HERE",
+      "sha256": "f6e46ac48d7919f0948baebac5cf1a69b4c4fe24e8ad62734d752bca8dde785a",
       "bytes": 0
     },
     {
       "name": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
       "destination": "historic_data/btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
-      "sha256": "PUT_SHA256_HERE",
+      "sha256": "7a3586d70bed2bb8a505ab38816f9a02446d3a3e03fb99a83a3787fb22d55396",
       "bytes": 0
     }
   ]
