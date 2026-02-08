@@ -2,12 +2,21 @@
   "release_tag": "data-v1",
   "assets": [
     {
+      "id": "3mo",
+      "name": "btcusdt_binance_spot_1m_2025-10-01_to_2025-12-31.parquet",
+      "destination": "historic_data/btcusdt_binance_spot_1m_2025-10-01_to_2025-12-31.parquet",
+      "sha256": "20fa82974b873eebb8d09262559b1de3899e7b526ceee0c67284265eaf0bba40",
+      "bytes": 0
+    },
+    {
+      "id": "full",
       "name": "btcusdt_binance_spot_1m_2018_to_2026.parquet",
       "destination": "historic_data/btcusdt_binance_spot_1m_2018_to_2026.parquet",
       "sha256": "f6e46ac48d7919f0948baebac5cf1a69b4c4fe24e8ad62734d752bca8dde785a",
       "bytes": 0
     },
     {
+      "id": "13mo",
       "name": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
       "destination": "historic_data/btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
       "sha256": "7a3586d70bed2bb8a505ab38816f9a02446d3a3e03fb99a83a3787fb22d55396",

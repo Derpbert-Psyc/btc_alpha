@@ -1297,7 +1297,7 @@ class BacktestRunner:
         while current_ts <= end_ts:
             # Progress logging (every 100k minutes = ~70 days)
             processed += 1
-            if processed % 100000 == 0:
+            if processed % 10000 == 0:
                 pct = (processed / total_minutes) * 100
                 print(f"  Progress: {processed}/{total_minutes} ({pct:.1f}%)")
             

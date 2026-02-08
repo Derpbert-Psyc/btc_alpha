@@ -9,10 +9,31 @@ from btc_alpha_phase3 import (
     BacktestRunner,
 )
 
-DATA = str(Path(__file__).resolve().parent / "historic_data" / "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet")
+# run_phase3_local.py
+#
+# This runner is intentionally pinned to the 3-month dataset for fast, repeatable validation.
+# It will NOT fall back to larger datasets.
+#
+# Expected dataset path (fetched via scripts/fetch_data.sh with default selector "3mo"):
+#   historic_data/btcusdt_binance_spot_1m_2025-10-01_to_2025-12-31.parquet
+
+DATA = (
+    Path(__file__).resolve().parent
+    / "historic_data"
+    / "btcusdt_binance_spot_1m_2025-10-01_to_2025-12-31.parquet"
+)
 
 
 def run_once(preset: FrictionPreset):
+    data_path = Path(DATA)
+    if not data_path.exists():
+        raise SystemExit(
+            f"missing required 3-month dataset:\n"
+            f"  {data_path}\n\n"
+            f"fetch it with:\n"
+            f"  ./scripts/fetch_data.sh\n"
+        )
+
     raw = load_data(DATA)
     candles, report = validate_candles(raw, GapPolicy.HALT)
     assert report.is_valid, report.error_message
@@ -34,7 +55,11 @@ def run_once(preset: FrictionPreset):
     result = runner.run(candles, start_ts, end_ts)
     return result
 
+
 def main():
+    print("Phase 3 local run (3-month dataset only)")
+    print(f"DATA: {DATA}")
+
     for preset in [FrictionPreset.CONSERVATIVE, FrictionPreset.PUNITIVE]:
         r1 = run_once(preset)
         r2 = run_once(preset)
@@ -51,12 +76,13 @@ def main():
         print(f"  config:  {r1.config_hash}")
 
         ok = (
-            r1.trades_hash == r2.trades_hash and
-            r1.equity_hash == r2.equity_hash and
-            r1.metrics_hash == r2.metrics_hash and
-            r1.config_hash == r2.config_hash
+            r1.trades_hash == r2.trades_hash
+            and r1.equity_hash == r2.equity_hash
+            and r1.metrics_hash == r2.metrics_hash
+            and r1.config_hash == r2.config_hash
         )
         print(f"Determinism rerun match: {ok}")
+
 
 if __name__ == "__main__":
     main()
