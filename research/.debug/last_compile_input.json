@@ -1,0 +1,85 @@
+{
+  "composition_id": "test_sweep",
+  "display_name": "Sweep Test",
+  "target_engine_version": "1.8.0",
+  "indicator_instances": [
+    {
+      "label": "macd_15m",
+      "indicator_id": 7,
+      "timeframe": "15m",
+      "parameters": {
+        "fast_period": 12,
+        "slow_period": 26,
+        "signal_period": 9
+      },
+      "outputs_used": [
+        "macd_line",
+        "signal_line",
+        "histogram"
+      ],
+      "warmup_bars": 35
+    }
+  ],
+  "entry_rules": [
+    {
+      "name": "Long Entry",
+      "direction": "LONG",
+      "evaluation_cadence": "15m",
+      "conditions": [
+        {
+          "indicator": "macd_15m",
+          "output": "histogram",
+          "operator": ">",
+          "value": 0
+        }
+      ],
+      "condition_groups": []
+    }
+  ],
+  "exit_rules": [
+    {
+      "name": "Signal Exit",
+      "type": "SIGNAL",
+      "applies_to": [
+        "LONG"
+      ],
+      "evaluation_cadence": "15m",
+      "conditions": [
+        {
+          "indicator": "macd_15m",
+          "output": "histogram",
+          "operator": "<",
+          "value": 0
+        }
+      ],
+      "parameters": {}
+    }
+  ],
+  "gate_rules": [],
+  "execution_params": {
+    "flip_enabled": false
+  },
+  "archetype_tags": [],
+  "metadata": {
+    "triage_sensitive_params": [
+      {
+        "param": "macd_15m.fast_period",
+        "min": 8,
+        "max": 16,
+        "default": 12
+      },
+      {
+        "param": "macd_15m.slow_period",
+        "min": 20,
+        "max": 32,
+        "default": 26
+      },
+      {
+        "param": "macd_15m.signal_period",
+        "min": 5,
+        "max": 13,
+        "default": 9
+      }
+    ]
+  }
+}

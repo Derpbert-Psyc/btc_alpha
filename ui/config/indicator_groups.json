@@ -1,0 +1,28 @@
+{
+  "groups": [
+    {
+      "name": "Trend",
+      "indicator_ids": [1, 7, 8, 12]
+    },
+    {
+      "name": "Momentum",
+      "indicator_ids": [2, 9]
+    },
+    {
+      "name": "Volatility",
+      "indicator_ids": [3, 11, 13, 14, 17]
+    },
+    {
+      "name": "Structure",
+      "indicator_ids": [4, 5, 15, 16, 18]
+    },
+    {
+      "name": "Regime",
+      "indicator_ids": [10]
+    },
+    {
+      "name": "Risk/Cross",
+      "indicator_ids": [6, 19, 20, 21, 22, 23, 24]
+    }
+  ]
+}

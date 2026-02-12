@@ -1,0 +1,172 @@
+{
+  "display_name": "DBMR — Double Bollinger Mean Reversion",
+  "description": "Bollinger Band mean reversion with structure-aware exits. Contrarian strategy that fades extremes.",
+  "spec_version": "1.5.2",
+  "target_engine_version": "1.8.0",
+  "target_instrument": "BTCUSDT",
+  "target_variant": "perp",
+  "archetype_tags": ["mean_reversion", "volatility_based"],
+  "indicator_instances": [
+    {
+      "label": "price_15m",
+      "indicator_id": "ema",
+      "timeframe": "15m",
+      "parameters": {"period": 1},
+      "outputs_used": ["ema"],
+      "role": "price",
+      "group": "Trend"
+    },
+    {
+      "label": "bb_15m",
+      "indicator_id": "bollinger",
+      "timeframe": "15m",
+      "parameters": {"period": 20, "num_std": 2.0},
+      "outputs_used": ["basis", "upper", "lower", "percent_b"],
+      "role": "trigger",
+      "group": "Volatility"
+    },
+    {
+      "label": "bb_1h",
+      "indicator_id": "bollinger",
+      "timeframe": "1h",
+      "parameters": {"period": 20, "num_std": 2.0},
+      "outputs_used": ["basis", "upper", "lower", "percent_b"],
+      "role": "filter",
+      "group": "Volatility"
+    },
+    {
+      "label": "rsi_15m",
+      "indicator_id": "rsi",
+      "timeframe": "15m",
+      "parameters": {"period": 14},
+      "outputs_used": ["rsi"],
+      "role": "filter",
+      "group": "Momentum"
+    },
+    {
+      "label": "atr_15m",
+      "indicator_id": "atr",
+      "timeframe": "15m",
+      "parameters": {"period": 14},
+      "outputs_used": ["atr"],
+      "role": "sizing",
+      "group": "Volatility"
+    },
+    {
+      "label": "donch_4h",
+      "indicator_id": "donchian",
+      "timeframe": "4h",
+      "parameters": {"period": 20},
+      "outputs_used": ["upper", "lower"],
+      "role": "filter",
+      "group": "Volatility"
+    }
+  ],
+  "entry_rules": [
+    {
+      "label": "Long Entry — BB Lower Touch",
+      "direction": "LONG",
+      "evaluation_cadence": "15m",
+      "conditions": [
+        {
+          "indicator": "bb_15m",
+          "output": "percent_b",
+          "operator": "<",
+          "value": 0.05
+        },
+        {
+          "indicator": "rsi_15m",
+          "output": "rsi",
+          "operator": "<",
+          "value": 30
+        }
+      ],
+      "condition_groups": []
+    },
+    {
+      "label": "Short Entry — BB Upper Touch",
+      "direction": "SHORT",
+      "evaluation_cadence": "15m",
+      "conditions": [
+        {
+          "indicator": "bb_15m",
+          "output": "percent_b",
+          "operator": ">",
+          "value": 0.95
+        },
+        {
+          "indicator": "rsi_15m",
+          "output": "rsi",
+          "operator": ">",
+          "value": 70
+        }
+      ],
+      "condition_groups": []
+    }
+  ],
+  "exit_rules": [
+    {
+      "label": "Stop Loss",
+      "exit_type": "STOP_LOSS",
+      "applies_to": ["LONG", "SHORT"],
+      "evaluation_cadence": "1m",
+      "mode": "FIXED_PERCENT",
+      "value_long_bps": 150,
+      "value_short_bps": 150,
+      "conditions": []
+    },
+    {
+      "label": "Take Profit — BB Basis",
+      "exit_type": "SIGNAL",
+      "applies_to": ["LONG", "SHORT"],
+      "evaluation_cadence": "15m",
+      "conditions": [
+        {
+          "indicator": "bb_15m",
+          "output": "percent_b",
+          "operator": ">",
+          "value": 0.5
+        }
+      ]
+    },
+    {
+      "label": "Time Limit",
+      "exit_type": "TIME_LIMIT",
+      "applies_to": ["LONG", "SHORT"],
+      "evaluation_cadence": "15m",
+      "time_limit_bars": 48,
+      "time_limit_reference_cadence": "15m",
+      "conditions": []
+    }
+  ],
+  "gate_rules": [],
+  "execution_params": {
+    "direction": "BOTH",
+    "leverage": 1,
+    "sizing_mode": "RISK_FRACTION",
+    "risk_fraction_bps": 75,
+    "flip_enabled": false,
+    "funding_model": {
+      "enabled": false,
+      "interval_hours": 8,
+      "rate_source": "FIXED",
+      "rate_per_interval_bps": 1,
+      "credit_allowed": false
+    }
+  },
+  "metadata": {
+    "thesis": "Mean reversion at Bollinger extremes with RSI confirmation. Lower band touch + oversold RSI = long entry, upper band + overbought = short. Exit at basis (mean). Donchian channels on 4H provide structure context.",
+    "known_risks": [
+      "Trend markets cause repeated stop-outs",
+      "BB squeeze periods produce false signals",
+      "Mean may shift during strong trends"
+    ],
+    "triage_sensitive_params": [
+      {"param": "bb_15m.period", "default": 20, "min": 10, "max": 30},
+      {"param": "rsi_15m.period", "default": 14, "min": 7, "max": 21},
+      {"param": "exit_rules.0.value_long_bps", "default": 150, "min": 75, "max": 300}
+    ],
+    "research_notes": [],
+    "user_tags": ["mean_reversion", "bollinger", "contrarian"]
+  }
+}
