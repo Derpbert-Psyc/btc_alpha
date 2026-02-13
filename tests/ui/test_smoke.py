@@ -84,7 +84,7 @@ def test_load_preset(clean_research):
     from ui.services.composition_store import create_composition, load_composition
 
     preset_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "ui", "presets", "macd_confluence.json")
+        os.path.dirname(__file__), "..", "..", "ui", "presets", "macd_confluence_long.json")
     with open(preset_path) as f:
         spec = json.load(f)
     spec.pop("composition_id", None)
@@ -92,8 +92,8 @@ def test_load_preset(clean_research):
 
     loaded = load_composition(cid)
     assert loaded is not None
-    assert loaded["display_name"] == "MACD Confluence"
-    assert len(loaded["indicator_instances"]) == 6
+    assert loaded["display_name"] == "MACD Confluence Long"
+    assert len(loaded["indicator_instances"]) == 8
     assert loaded["composition_id"] == cid  # New UUID
 
 
@@ -103,7 +103,7 @@ def test_compile_preset(clean_research):
     from ui.services.compiler_bridge import compile_spec
 
     preset_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "ui", "presets", "macd_confluence.json")
+        os.path.dirname(__file__), "..", "..", "ui", "presets", "macd_confluence_long.json")
     with open(preset_path) as f:
         spec = json.load(f)
     spec.pop("composition_id", None)

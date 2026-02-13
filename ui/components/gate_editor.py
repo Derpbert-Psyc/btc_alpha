@@ -68,7 +68,7 @@ def render_gate_editor(state, on_change: Callable):
                             label="Gate Name",
                         ).classes("w-48").props("dense")
                         name_input.on("change", lambda e, idx=i: _update_gate_field(
-                            state, idx, "label", e.value, on_change))
+                            state, idx, "label", e.args, on_change))
 
                         pol_select = ui.select(
                             policies,
@@ -76,7 +76,7 @@ def render_gate_editor(state, on_change: Callable):
                             label="Exit Policy",
                         ).classes("w-40").props("dense")
                         pol_select.on("update:model-value", lambda e, idx=i: _update_gate_field(
-                            state, idx, "exit_policy", e.value, on_change))
+                            state, idx, "exit_policy", e.args, on_change))
 
                         ui.badge(policy, color=color)
 

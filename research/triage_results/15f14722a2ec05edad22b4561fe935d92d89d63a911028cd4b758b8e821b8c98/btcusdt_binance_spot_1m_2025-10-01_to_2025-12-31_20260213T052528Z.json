@@ -1,0 +1,29 @@
+{
+  "strategy_config_hash": "sha256:15f14722a2ec05edad22b4561fe935d92d89d63a911028cd4b758b8e821b8c98",
+  "dataset_prefix": "btcusdt_binance_spot_1m_2025-10-01_to_2025-12-31",
+  "dataset_filename": "btcusdt_binance_spot_1m_2025-10-01_to_2025-12-31.parquet",
+  "runner_economics": {
+    "fee_rate": 0.0006,
+    "slippage_bps": 10,
+    "starting_capital": 10000
+  },
+  "trade_count": 205,
+  "bar_count": 132480,
+  "passed": false,
+  "reason": "Test 1 FAIL: oos_sharpe=-133617 < min=300000; oos_sharpe=-133617 < 0.5*train=1431",
+  "test_results": {
+    "test_1": {
+      "passed": false,
+      "reason": "oos_sharpe=-133617 < min=300000; oos_sharpe=-133617 < 0.5*train=1431",
+      "train_sharpe": 2862,
+      "oos_sharpe": -133617,
+      "train_trades": 157,
+      "oos_trades": 47
+    }
+  },
+  "train_sharpe": 2862,
+  "oos_sharpe": -133617,
+  "mc_p_value": null,
+  "param_pass_rate": null,
+  "timestamp": "20260213T052528Z"
+}

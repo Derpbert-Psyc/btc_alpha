@@ -435,9 +435,9 @@ def compute_indicator_outputs(
         result["atr"] = compute_atr(highs, lows, closes, period)
 
     elif ind_id == 7:  # MACD
-        fast = params.get("fast_period", 12)
-        slow = params.get("slow_period", 26)
-        sig = params.get("signal_period", 9)
+        fast = params.get("fast_period", params.get("fast", 12))
+        slow = params.get("slow_period", params.get("slow", 26))
+        sig = params.get("signal_period", params.get("signal", 9))
         ml, sl, hist, ss = compute_macd(closes, fast, slow, sig)
         result["macd_line"] = ml
         result["signal_line"] = sl
@@ -523,8 +523,14 @@ def run_backtest(
     resolved_config: dict,
     bars_1m: List[Bar],
     strategy_hash: str = "",
+    fee_override_bps: Optional[int] = None,
+    slippage_override_bps: Optional[int] = None,
 ) -> Tuple[List[TradeEvent], List[float], int]:
     """Run backtest on resolved config with 1m bar data.
+
+    Args:
+        fee_override_bps: If provided, overrides configured fee (per fill, in bps).
+        slippage_override_bps: If provided, overrides configured slippage (per fill, in bps).
 
     Returns:
         trades: List[TradeEvent]
@@ -722,8 +728,20 @@ def run_backtest(
             signal.action = "EXIT"
             signal.exit_reason = exit_override_reason
         else:
+            # Filter exit rules by applies_to for the current position direction.
+            # The framework does not enforce applies_to, so the runner must.
+            if position is not None:
+                pos_dir = position["direction"]
+                filtered_exits = [
+                    r for r in exit_rules
+                    if not r.get("applies_to") or pos_dir in r["applies_to"]
+                ]
+                eval_config = dict(resolved_config, exit_rules=filtered_exits)
+            else:
+                eval_config = resolved_config
+
             signal = evaluate_signal_pipeline(
-                config=resolved_config,
+                config=eval_config,
                 indicator_outputs=indicator_outputs,
                 prev_outputs=prev_outputs,
                 position=pos_dict,

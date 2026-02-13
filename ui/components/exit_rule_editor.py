@@ -58,7 +58,7 @@ def render_exit_rules(state, on_change: Callable):
                             label="Name",
                         ).classes("w-48").props("dense")
                         name_input.on("change", lambda e, idx=i: _update_exit_field(
-                            state, idx, "label", e.value, on_change))
+                            state, idx, "label", e.args, on_change))
 
                         type_select = ui.select(
                             available_types,
@@ -66,15 +66,19 @@ def render_exit_rules(state, on_change: Callable):
                             label="Type",
                         ).classes("w-44").props("dense")
                         type_select.on("update:model-value", lambda e, idx=i: _update_exit_field(
-                            state, idx, "exit_type", e.value, on_change))
+                            state, idx, "exit_type", e.args, on_change))
 
+                        raw_cadence = rule.get("evaluation_cadence", "1m")
+                        cadence_opts = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d"]
+                        if raw_cadence not in cadence_opts:
+                            cadence_opts.append(raw_cadence)
                         cadence = ui.select(
-                            ["1m", "5m", "15m", "30m", "1h", "4h"],
-                            value=rule.get("evaluation_cadence", "1m"),
+                            cadence_opts,
+                            value=raw_cadence,
                             label="Cadence",
                         ).classes("w-24").props("dense")
                         cadence.on("update:model-value", lambda e, idx=i: _update_exit_field(
-                            state, idx, "evaluation_cadence", e.value, on_change))
+                            state, idx, "evaluation_cadence", e.args, on_change))
 
                     with ui.row().classes("gap-1"):
                         if i > 0:
@@ -106,41 +110,45 @@ def render_exit_rules(state, on_change: Callable):
 
 
 def _render_stop_loss_params(state, idx, rule, on_change):
+    _MODE_ALIASES = {"PERCENT": "FIXED_PERCENT"}
     with ui.row().classes("gap-4 mt-2"):
+        raw_mode = rule.get("mode", "FIXED_PERCENT")
         mode = ui.select(["FIXED_PERCENT", "ATR_MULTIPLE"],
-                         value=rule.get("mode", "FIXED_PERCENT"),
+                         value=_MODE_ALIASES.get(raw_mode, raw_mode),
                          label="Mode").classes("w-40").props("dense")
         mode.on("update:model-value", lambda e: _update_exit_field(
-            state, idx, "mode", e.value, on_change))
+            state, idx, "mode", e.args, on_change))
 
         vl = ui.number(value=rule.get("value_long_bps", 200),
                        label="Long (bps)").classes("w-28").props("dense")
         vl.on("change", lambda e: _update_exit_field(
-            state, idx, "value_long_bps", int(e.value), on_change))
+            state, idx, "value_long_bps", int(e.args), on_change))
 
         vs = ui.number(value=rule.get("value_short_bps", 200),
                        label="Short (bps)").classes("w-28").props("dense")
         vs.on("change", lambda e: _update_exit_field(
-            state, idx, "value_short_bps", int(e.value), on_change))
+            state, idx, "value_short_bps", int(e.args), on_change))
 
 
 def _render_trailing_stop_params(state, idx, rule, on_change):
+    _MODE_ALIASES = {"PERCENT": "FIXED_PERCENT"}
     with ui.row().classes("gap-4 mt-2"):
+        raw_mode = rule.get("mode", "ATR_MULTIPLE")
         mode = ui.select(["FIXED_PERCENT", "ATR_MULTIPLE"],
-                         value=rule.get("mode", "ATR_MULTIPLE"),
+                         value=_MODE_ALIASES.get(raw_mode, raw_mode),
                          label="Mode").classes("w-40").props("dense")
         mode.on("update:model-value", lambda e: _update_exit_field(
-            state, idx, "mode", e.value, on_change))
+            state, idx, "mode", e.args, on_change))
 
         vl = ui.number(value=rule.get("value_long_bps", 300),
                        label="Long (bps)").classes("w-28").props("dense")
         vl.on("change", lambda e: _update_exit_field(
-            state, idx, "value_long_bps", int(e.value), on_change))
+            state, idx, "value_long_bps", int(e.args), on_change))
 
         vs = ui.number(value=rule.get("value_short_bps", 300),
                        label="Short (bps)").classes("w-28").props("dense")
         vs.on("change", lambda e: _update_exit_field(
-            state, idx, "value_short_bps", int(e.value), on_change))
+            state, idx, "value_short_bps", int(e.args), on_change))
 
 
 def _render_time_limit_params(state, idx, rule, on_change):
@@ -148,13 +156,17 @@ def _render_time_limit_params(state, idx, rule, on_change):
         bars = ui.number(value=rule.get("time_limit_bars", 96),
                          label="Max bars").classes("w-28").props("dense")
         bars.on("change", lambda e: _update_exit_field(
-            state, idx, "time_limit_bars", int(e.value), on_change))
+            state, idx, "time_limit_bars", int(e.args), on_change))
 
-        ref = ui.select(["1m", "5m", "15m", "30m", "1h", "4h"],
-                        value=rule.get("time_limit_reference_cadence", "15m"),
+        raw_ref = rule.get("time_limit_reference_cadence", "15m")
+        ref_opts = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d"]
+        if raw_ref not in ref_opts:
+            ref_opts.append(raw_ref)
+        ref = ui.select(ref_opts,
+                        value=raw_ref,
                         label="Reference cadence").classes("w-32").props("dense")
         ref.on("update:model-value", lambda e: _update_exit_field(
-            state, idx, "time_limit_reference_cadence", e.value, on_change))
+            state, idx, "time_limit_reference_cadence", e.args, on_change))
 
 
 def _render_mtm_params(state, idx, rule, on_change):
@@ -162,12 +174,12 @@ def _render_mtm_params(state, idx, rule, on_change):
         dl = ui.number(value=rule.get("drawdown_bps_long", 500),
                        label="DD Long (bps)").classes("w-28").props("dense")
         dl.on("change", lambda e: _update_exit_field(
-            state, idx, "drawdown_bps_long", int(e.value), on_change))
+            state, idx, "drawdown_bps_long", int(e.args), on_change))
 
         ds = ui.number(value=rule.get("drawdown_bps_short", 500),
                        label="DD Short (bps)").classes("w-28").props("dense")
         ds.on("change", lambda e: _update_exit_field(
-            state, idx, "drawdown_bps_short", int(e.value), on_change))
+            state, idx, "drawdown_bps_short", int(e.args), on_change))
 
 
 def _update_exit_field(state, idx, field, value, on_change):

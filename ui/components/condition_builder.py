@@ -33,6 +33,13 @@ def _get_instance_outputs(spec: dict, label: str) -> List[str]:
     return []
 
 
+def _safe_value(options: list, value, fallback=None):
+    """Return value if it exists in options, otherwise fallback."""
+    if value in options:
+        return value
+    return fallback
+
+
 def render_condition_builder(
     state,
     conditions: List[dict],
@@ -51,28 +58,30 @@ def render_condition_builder(
                 # Instance selector
                 ind_select = ui.select(
                     labels,
-                    value=cond.get("indicator", ""),
+                    value=_safe_value(labels, cond.get("indicator", "")),
                     label="Instance",
-                ).classes("w-40").props("dense")
+                ).classes("w-40").props("dense clearable")
 
                 # Output selector
                 current_outputs = _get_instance_outputs(spec, cond.get("indicator", ""))
+                out_options = current_outputs or ["(select instance)"]
                 out_select = ui.select(
-                    current_outputs or ["(select instance)"],
-                    value=cond.get("output", ""),
+                    out_options,
+                    value=_safe_value(out_options, cond.get("output", "")),
                     label="Output",
-                ).classes("w-32").props("dense")
+                ).classes("w-32").props("dense clearable")
 
                 # Update outputs when instance changes
                 def update_outputs(e, os=out_select):
-                    outs = _get_instance_outputs(spec, e.value)
+                    outs = _get_instance_outputs(spec, e.args)
                     os.options = outs or ["(none)"]
                 ind_select.on("update:model-value", update_outputs)
 
                 # Operator selector
                 op_select = ui.select(
                     available_ops,
-                    value=cond.get("operator", ">"),
+                    value=_safe_value(available_ops, cond.get("operator", ">"),
+                                     fallback=available_ops[0] if available_ops else None),
                     label="Op",
                 ).classes("w-32").props("dense")
 
@@ -85,14 +94,15 @@ def render_condition_builder(
                 elif is_cross_ref:
                     ref_ind = ui.select(
                         labels,
-                        value=cond.get("ref_indicator", ""),
+                        value=_safe_value(labels, cond.get("ref_indicator", "")),
                         label="Ref Instance",
-                    ).classes("w-32").props("dense")
+                    ).classes("w-32").props("dense clearable")
+                    ref_outputs = _get_instance_outputs(spec, cond.get("ref_indicator", "")) or ["(select instance)"]
                     ref_out = ui.select(
-                        _get_instance_outputs(spec, cond.get("ref_indicator", "")),
-                        value=cond.get("ref_output", ""),
+                        ref_outputs,
+                        value=_safe_value(ref_outputs, cond.get("ref_output", "")),
                         label="Ref Output",
-                    ).classes("w-28").props("dense")
+                    ).classes("w-28").props("dense clearable")
                 else:
                     val_input = ui.number(
                         value=cond.get("value", 0),
@@ -111,17 +121,17 @@ def render_condition_builder(
                 # Wire changes
                 def save_cond(e=None, idx=i):
                     c = conditions[idx]
-                    c["indicator"] = ind_select.value
-                    c["output"] = out_select.value
-                    c["operator"] = op_select.value
+                    c["indicator"] = ind_select.value or ""
+                    c["output"] = out_select.value or ""
+                    c["operator"] = op_select.value or ">"
                     if op_select.value in ("is_present", "is_absent"):
                         c.pop("value", None)
                         c.pop("ref_indicator", None)
                         c.pop("ref_output", None)
                     elif xref_toggle.value:
                         c.pop("value", None)
-                        c["ref_indicator"] = ref_ind.value if is_cross_ref else ""
-                        c["ref_output"] = ref_out.value if is_cross_ref else ""
+                        c["ref_indicator"] = (ref_ind.value or "") if is_cross_ref else ""
+                        c["ref_output"] = (ref_out.value or "") if is_cross_ref else ""
                     else:
                         c["value"] = val_input.value if not is_unary and not is_cross_ref else 0
                         c.pop("ref_indicator", None)

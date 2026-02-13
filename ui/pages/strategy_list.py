@@ -40,17 +40,20 @@ def _build_row(entry: Dict[str, Any]) -> Dict[str, Any]:
     cid = entry["composition_id"]
     spec = load_composition(cid)
 
-    lifecycle, warning = derive_lifecycle_state(
+    lifecycle, dataset_count, warning = derive_lifecycle_state(
         cid, entry.get("latest_compiled_hash"))
 
     archetype_tags = []
     user_tags = []
-    warmup = ""
     if spec:
         archetype_tags = spec.get("archetype_tags", [])
         user_tags = spec.get("metadata", {}).get("user_tags", [])
-        # warmup derived from compiled hash if available
-        hash_val = entry.get("latest_compiled_hash", "")
+
+    # Format lifecycle with dataset count
+    lifecycle_display = lifecycle
+    if dataset_count > 0 and lifecycle not in ("DRAFT", "COMPILED", "CORRUPTED"):
+        ds_label = "dataset" if dataset_count == 1 else "datasets"
+        lifecycle_display = f"{lifecycle} ({dataset_count} {ds_label})"
 
     return {
         "composition_id": cid,
@@ -58,9 +61,8 @@ def _build_row(entry: Dict[str, Any]) -> Dict[str, Any]:
         "archetype_tags": ", ".join(archetype_tags),
         "user_tags": ", ".join(user_tags),
         "lifecycle_state": lifecycle,
+        "lifecycle_display": lifecycle_display,
         "lifecycle_warning": warning,
-        "binding_state": "current",
-        "warmup": warmup,
         "hash": (entry.get("latest_compiled_hash") or "—")[:20],
         "updated_at": entry.get("updated_at", ""),
     }
@@ -154,7 +156,7 @@ def strategy_list_page():
                                          props.row.lifecycle_state === 'COMPILED' ? 'blue' :
                                          props.row.lifecycle_state === 'TRIAGE_PASSED' ? 'green' :
                                          'purple'"
-                                 :label="props.row.lifecycle_state" />
+                                 :label="props.row.lifecycle_display || props.row.lifecycle_state" />
                         <q-tooltip v-if="props.row.lifecycle_warning">
                             {{ props.row.lifecycle_warning }}
                         </q-tooltip>

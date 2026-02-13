@@ -30,6 +30,10 @@ from ui.components.compiler_panel import render_compiler_panel
 from composition_compiler_v1_5_2 import CompilationError, CAPABILITY_REGISTRY
 from strategy_framework_v1_8_0 import INDICATOR_OUTPUTS, INDICATOR_NAME_TO_ID
 
+# Module-level state cache: persists EditorState across page navigations
+# so that ui.navigate.to() for re-rendering doesn't lose in-memory edits.
+_editor_states: Dict[str, 'EditorState'] = {}
+
 
 class EditorState:
     """In-memory editor state — separate from on-disk spec."""
@@ -62,13 +66,18 @@ class EditorState:
 
 def composition_editor_page(composition_id: str):
     """Render the composition editor for a given composition."""
-    spec = load_composition(composition_id)
-    if spec is None:
-        ui.label("Composition not found").classes("text-red-400 text-xl p-8")
-        ui.button("Back to list", on_click=lambda: ui.navigate.to("/"))
-        return
-
-    state = EditorState(composition_id, spec)
+    # Reuse existing in-memory state if available (preserves unsaved edits
+    # across ui.navigate.to re-renders). Create fresh state only on first load.
+    if composition_id in _editor_states:
+        state = _editor_states[composition_id]
+    else:
+        spec = load_composition(composition_id)
+        if spec is None:
+            ui.label("Composition not found").classes("text-red-400 text-xl p-8")
+            ui.button("Back to list", on_click=lambda: ui.navigate.to("/"))
+            return
+        state = EditorState(composition_id, spec)
+        _editor_states[composition_id] = state
 
     with ui.column().classes("w-full max-w-7xl mx-auto p-4"):
         # Header bar
@@ -113,6 +122,9 @@ def composition_editor_page(composition_id: str):
         compiler_container = ui.column().classes("w-full")
         render_compiler_panel(state, compiler_container)
 
+        # Store container ref on state so _do_compile can re-render
+        state._compiler_container = compiler_container
+
 
 def _render_header(state: EditorState):
     """Render the editor header with name, actions, tags."""
@@ -120,13 +132,16 @@ def _render_header(state: EditorState):
 
     with ui.row().classes("w-full items-center justify-between mb-2"):
         with ui.row().classes("items-center gap-4"):
-            ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/")).props(
+            def _go_back():
+                _editor_states.pop(state.composition_id, None)
+                ui.navigate.to("/")
+            ui.button(icon="arrow_back", on_click=_go_back).props(
                 "flat dense round")
             name_input = ui.input(
                 value=spec.get("display_name", "Untitled"),
             ).classes("text-xl font-bold w-96").props("dense borderless")
             name_input.on("change", lambda e: _update_field(
-                state, "display_name", e.value))
+                state, "display_name", e.args))
 
             # Engine version badge
             ev = spec.get("target_engine_version", "1.8.0")
@@ -150,7 +165,7 @@ def _render_header(state: EditorState):
         value=spec.get("description", ""),
         label="Description",
     ).classes("w-full mb-2")
-    desc_input.on("change", lambda e: _update_field(state, "description", e.value))
+    desc_input.on("change", lambda e: _update_field(state, "description", e.args))
 
     # Archetype tags
     CANONICAL_ARCHETYPES = [
@@ -163,7 +178,7 @@ def _render_header(state: EditorState):
         for tag in CANONICAL_ARCHETYPES:
             active = tag in spec.get("archetype_tags", [])
             chip = ui.chip(tag, selectable=True, selected=active).props("dense")
-            chip.on("update:selected", lambda e, t=tag: _toggle_archetype(state, t, e.value))
+            chip.on("update:selected", lambda e, t=tag: _toggle_archetype(state, t, e.args))
 
 
 def _update_field(state: EditorState, field: str, value):
@@ -181,11 +196,14 @@ def _toggle_archetype(state: EditorState, tag: str, selected: bool):
 
 
 def _do_compile(state: EditorState):
-    """Compile current in-memory spec."""
+    """Compile current in-memory spec and re-render compiler panel."""
     try:
         result = state.compile()
         hash_val = result["strategy_config_hash"]
         ui.notify(f"Compiled: {hash_val[:24]}...", type="positive")
+        # Re-render the compiler panel to show triage section
+        if hasattr(state, "_compiler_container"):
+            render_compiler_panel(state, state._compiler_container)
     except CompilationError as e:
         ui.notify(f"Compilation error: {e}", type="negative", timeout=10000)
     except Exception as e:
@@ -195,6 +213,8 @@ def _do_compile(state: EditorState):
 def _do_save(state: EditorState):
     """Save working spec to disk."""
     state.save_to_disk()
+    # Update cached state so disk_spec reflects the save
+    _editor_states[state.composition_id] = state
     if state.last_compilation:
         hash_val = state.last_compilation["strategy_config_hash"]
         update_compiled_hash(state.composition_id, hash_val)
@@ -208,6 +228,8 @@ def _do_save(state: EditorState):
 def _do_revert(state: EditorState):
     """Revert to on-disk spec."""
     state.revert()
+    # Update the cached state so the revert is reflected on re-render
+    _editor_states[state.composition_id] = state
     ui.notify("Reverted to last save", type="info")
     ui.navigate.to(f"/editor/{state.composition_id}")
 
@@ -278,17 +300,35 @@ async def _add_indicator(state: EditorState, on_change):
         ui.navigate.to(f"/editor/{state.composition_id}")
 
 
-def _delete_indicator(state: EditorState, idx, on_change):
-    """Delete an indicator if not referenced."""
+async def _delete_indicator(state: EditorState, idx, on_change):
+    """Delete an indicator, with cascade confirmation if referenced."""
     instances = state.working_spec.get("indicator_instances", [])
     if idx < 0 or idx >= len(instances):
         return
 
     label = instances[idx].get("label", "")
-    # Check references
-    if _is_indicator_referenced(state.working_spec, label):
-        ui.notify(f"Cannot delete '{label}' — referenced in rules", type="negative")
-        return
+    refs = _find_indicator_references(state.working_spec, label)
+
+    if refs:
+        # Show cascade confirmation dialog
+        with ui.dialog() as dialog, ui.card().classes("w-[600px]"):
+            ui.label(f"Delete '{label}'?").classes("text-lg font-bold")
+            ui.label("This indicator is referenced in:").classes("text-sm mt-2")
+            for ref in refs:
+                ui.label(f"  - {ref}").classes("text-sm text-amber-400")
+            ui.label(
+                "Deleting will remove the indicator AND all conditions that reference it. "
+                "Rules with no remaining conditions will also be removed."
+            ).classes("text-sm text-gray-400 mt-2")
+            with ui.row().classes("w-full justify-end gap-2 mt-4"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+                ui.button("Delete All", on_click=lambda: dialog.submit(True)).props(
+                    "color=negative")
+        dialog.open()
+        confirmed = await dialog
+        if not confirmed:
+            return
+        _cascade_remove_references(state.working_spec, label)
 
     instances.pop(idx)
     state.mark_changed()
@@ -296,25 +336,75 @@ def _delete_indicator(state: EditorState, idx, on_change):
     ui.navigate.to(f"/editor/{state.composition_id}")
 
 
-def _is_indicator_referenced(spec: dict, label: str) -> bool:
-    """Check if an indicator label is referenced in any rule."""
+def _find_indicator_references(spec: dict, label: str) -> List[str]:
+    """Find all rules/conditions that reference an indicator label."""
+    refs = []
     for rule in spec.get("entry_rules", []):
-        for cond in rule.get("conditions", []):
+        rule_label = rule.get("label", "entry rule")
+        for i, cond in enumerate(rule.get("conditions", [])):
             if cond.get("indicator") == label:
-                return True
+                refs.append(f"Entry Rule '{rule_label}' condition {i+1}")
         for grp in rule.get("condition_groups", []):
-            for cond in grp.get("conditions", []):
+            grp_label = grp.get("label", "group")
+            for i, cond in enumerate(grp.get("conditions", [])):
                 if cond.get("indicator") == label:
-                    return True
+                    refs.append(f"Entry Rule '{rule_label}' / {grp_label} condition {i+1}")
     for rule in spec.get("exit_rules", []):
-        for cond in rule.get("conditions", []):
+        rule_label = rule.get("label", "exit rule")
+        for i, cond in enumerate(rule.get("conditions", [])):
             if cond.get("indicator") == label:
-                return True
+                refs.append(f"Exit Rule '{rule_label}' condition {i+1}")
     for rule in spec.get("gate_rules", []):
-        for cond in rule.get("conditions", []):
+        rule_label = rule.get("label", "gate")
+        for i, cond in enumerate(rule.get("conditions", [])):
             if cond.get("indicator") == label:
-                return True
-    return False
+                refs.append(f"Gate '{rule_label}' condition {i+1}")
+    return refs
+
+
+def _cascade_remove_references(spec: dict, label: str):
+    """Remove all conditions referencing an indicator, and empty rules."""
+    # Entry rules
+    for rule in list(spec.get("entry_rules", [])):
+        rule["conditions"] = [
+            c for c in rule.get("conditions", [])
+            if c.get("indicator") != label
+        ]
+        for grp in list(rule.get("condition_groups", [])):
+            grp["conditions"] = [
+                c for c in grp.get("conditions", [])
+                if c.get("indicator") != label
+            ]
+        rule["condition_groups"] = [
+            g for g in rule.get("condition_groups", [])
+            if g.get("conditions")
+        ]
+    spec["entry_rules"] = [
+        r for r in spec.get("entry_rules", [])
+        if r.get("conditions") or r.get("condition_groups")
+    ]
+
+    # Exit rules
+    for rule in list(spec.get("exit_rules", [])):
+        rule["conditions"] = [
+            c for c in rule.get("conditions", [])
+            if c.get("indicator") != label
+        ]
+    spec["exit_rules"] = [
+        r for r in spec.get("exit_rules", [])
+        if r.get("conditions") or r.get("exit_type", "SIGNAL") != "SIGNAL"
+    ]
+
+    # Gate rules
+    for rule in list(spec.get("gate_rules", [])):
+        rule["conditions"] = [
+            c for c in rule.get("conditions", [])
+            if c.get("indicator") != label
+        ]
+    spec["gate_rules"] = [
+        r for r in spec.get("gate_rules", [])
+        if r.get("conditions")
+    ]
 
 
 def _render_entry_rules_tab(state: EditorState, on_change):
@@ -357,15 +447,19 @@ def _render_entry_direction(state: EditorState, direction: str, on_change):
                         label="Rule name",
                     ).classes("w-64").props("dense")
                     name_input.on("change", lambda e, i=idx: _update_entry_field(
-                        state, i, "label", e.value, on_change))
+                        state, i, "label", e.args, on_change))
 
+                    raw_cadence = rule.get("evaluation_cadence", "1m")
+                    cadence_opts = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d"]
+                    if raw_cadence not in cadence_opts:
+                        cadence_opts.append(raw_cadence)
                     cadence = ui.select(
-                        ["1m", "5m", "15m", "30m", "1h", "4h"],
-                        value=rule.get("evaluation_cadence", "1m"),
+                        cadence_opts,
+                        value=raw_cadence,
                         label="Cadence",
                     ).classes("w-24").props("dense")
                     cadence.on("update:model-value", lambda e, i=idx: _update_entry_field(
-                        state, i, "evaluation_cadence", e.value, on_change))
+                        state, i, "evaluation_cadence", e.args, on_change))
 
                     ui.button(icon="delete", on_click=lambda i=idx: _delete_entry_rule(
                         state, i, on_change)).props("flat dense round color=negative")

@@ -1,0 +1,29 @@
+{
+  "indicator_instances": [],
+  "entry_rules": [],
+  "exit_rules": [],
+  "gate_rules": [],
+  "execution_params": {
+    "direction": "BOTH",
+    "leverage": 1,
+    "sizing_mode": "RISK_FRACTION",
+    "risk_fraction_bps": 100,
+    "flip_enabled": false
+  },
+  "archetype_tags": [],
+  "metadata": {
+    "thesis": "",
+    "known_risks": [],
+    "triage_sensitive_params": [],
+    "research_notes": [],
+    "user_tags": [],
+    "created": "2026-02-13T07:26:20.321325+00:00",
+    "updated_at": "2026-02-13T07:26:20.321325+00:00"
+  },
+  "composition_id": "20b1eedb-df2f-49eb-bfd4-c08fadfd4d43",
+  "display_name": "New Strategy",
+  "spec_version": "1.5.2",
+  "target_engine_version": "1.8.0",
+  "target_instrument": "BTCUSDT",
+  "target_variant": "perp"
+}

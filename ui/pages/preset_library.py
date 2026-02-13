@@ -19,9 +19,15 @@ def _load_preset_file(filename: str) -> Dict[str, Any]:
 
 PRESET_INFO = [
     {
-        "name": "MACD Confluence",
-        "file": "macd_confluence.json",
-        "description": "Multi-TF MACD alignment, momentum trigger, ATR sizing, Chop gating, SL+trail+time exits.",
+        "name": "MACD Confluence Long",
+        "file": "macd_confluence_long.json",
+        "description": "Long-only multi-TF MACD alignment. Enter long on 5m momentum inflection with 6-TF consensus. Exit on 1D slope reversal.",
+        "archetype": "trend_following, multi_timeframe",
+    },
+    {
+        "name": "MACD Confluence Short",
+        "file": "macd_confluence_short.json",
+        "description": "Short-only multi-TF MACD alignment. Enter short on 5m momentum inflection with 6-TF consensus. Exit on 1D slope reversal.",
         "archetype": "trend_following, multi_timeframe",
     },
     {

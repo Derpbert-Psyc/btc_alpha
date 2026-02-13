@@ -1,0 +1,190 @@
+{
+  "composition_id": "macd_confluence_long_v1",
+  "display_name": "MACD Confluence Long",
+  "description": "Long-only multi-timeframe MACD alignment. Enter long when 5m momentum inflects upward in direction of 6-TF trend consensus. Exit on daily MACD slope reversal. Fast in, slow out.",
+  "archetype_tags": ["trend_following", "multi_timeframe"],
+  "version": "1.0.0",
+  "target_engine_version": "1.8.0",
+  "min_engine_version": "1.8.0",
+  "target_instrument": "BTCUSDT",
+  "target_variant": "perp",
+
+  "indicator_instances": [
+    {
+      "label": "macro_3d",
+      "role": "filter",
+      "group": "macro",
+      "indicator_id": "macd_tv",
+      "timeframe": "3d",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "macro_1d",
+      "role": "filter",
+      "group": "macro",
+      "indicator_id": "macd_tv",
+      "timeframe": "1d",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "macro_12h",
+      "role": "filter",
+      "group": "macro",
+      "indicator_id": "macd_tv",
+      "timeframe": "12h",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "intra_1h",
+      "role": "filter",
+      "group": "intra",
+      "indicator_id": "macd_tv",
+      "timeframe": "1h",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "intra_30m",
+      "role": "filter",
+      "group": "intra",
+      "indicator_id": "macd_tv",
+      "timeframe": "30m",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "intra_15m",
+      "role": "filter",
+      "group": "intra",
+      "indicator_id": "macd_tv",
+      "timeframe": "15m",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "entry_5m",
+      "role": "entry_signal",
+      "indicator_id": "macd_tv",
+      "timeframe": "5m",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["macd_line", "slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "exit_1d",
+      "role": "exit_signal",
+      "indicator_id": "macd_tv",
+      "timeframe": "1d",
+      "parameters": {"fast": 12, "slow": 26, "signal": 9},
+      "outputs_used": ["slope_sign"],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    }
+  ],
+
+  "entry_rules": [
+    {
+      "label": "long_entry",
+      "direction": "LONG",
+      "evaluation_cadence": "5m",
+      "entry_type": "MARKET",
+      "condition_groups": [
+        {
+          "label": "macro_alignment",
+          "description": "All macro TF MACD slopes must be positive",
+          "role_condition": {
+            "role": "filter",
+            "filter_group": "macro",
+            "output": "slope_sign",
+            "operator": ">",
+            "value": "0",
+            "quantifier": "ALL"
+          }
+        },
+        {
+          "label": "intra_alignment",
+          "description": "All intra TF MACD slopes must be positive",
+          "role_condition": {
+            "role": "filter",
+            "filter_group": "intra",
+            "output": "slope_sign",
+            "operator": ">",
+            "value": "0",
+            "quantifier": "ALL"
+          }
+        }
+      ],
+      "conditions": [
+        {
+          "role": "entry_signal",
+          "output": "slope_sign",
+          "operator": "crosses_above",
+          "value": "0"
+        }
+      ]
+    }
+  ],
+
+  "exit_rules": [
+    {
+      "label": "long_signal_exit",
+      "exit_type": "SIGNAL",
+      "applies_to": ["LONG"],
+      "evaluation_cadence": "1d",
+      "conditions": [
+        {
+          "indicator": "exit_1d",
+          "output": "slope_sign",
+          "operator": "<",
+          "value": "0"
+        }
+      ]
+    }
+  ],
+
+  "gate_rules": [],
+
+  "execution_params": {
+    "direction": "LONG",
+    "leverage": 1.0,
+    "position_sizing": {
+      "mode": "RISK_FRACTION",
+      "risk_fraction_bps": 10000
+    },
+    "flip_enabled": false
+  },
+
+  "metadata": {
+    "spec_version": "1.5.2",
+    "thesis": "Long-only: enter when short-term momentum inflects upward in direction of multi-TF trend alignment. Exit when daily-TF shows momentum reversal. Fast in, slow out.",
+    "known_risks": [
+      "81-day warmup from 3D MACD — first 81 days produce no trades",
+      "Inactive in low-volatility sideways markets (zero slope on any TF blocks entry)",
+      "1D exit cadence means exits can be delayed up to 24h after reversal signal"
+    ],
+    "triage_sensitive_params": [
+      {"param": "fast_period", "default": 12, "min": 6, "max": 20},
+      {"param": "slow_period", "default": 26, "min": 16, "max": 52}
+    ],
+    "research_notes": [],
+    "user_tags": ["trend", "macd", "multi_tf", "long_only"],
+    "forked_from": null,
+    "archive_reason": null
+  }
+}

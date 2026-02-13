@@ -27,7 +27,7 @@ def clean_research(tmp_path, monkeypatch):
 
 def _load_macd_spec():
     preset_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "ui", "presets", "macd_confluence.json")
+        os.path.dirname(__file__), "..", "..", "ui", "presets", "macd_confluence_long.json")
     with open(preset_path) as f:
         return json.load(f)
 
@@ -77,7 +77,7 @@ def test_atomic_index_write(clean_research):
 def test_lifecycle_draft_no_hash(clean_research):
     """No compiled hash → DRAFT state."""
     from ui.services.promotion_reader import derive_lifecycle_state
-    state, warning = derive_lifecycle_state("test-id", None)
+    state, _ds_count, warning = derive_lifecycle_state("test-id", None)
     assert state == "DRAFT"
     assert warning is None
 
@@ -92,7 +92,7 @@ def test_lifecycle_compiled_with_artifact(clean_research):
     save_artifacts(result)
 
     hash_val = result["strategy_config_hash"]
-    state, warning = derive_lifecycle_state("test-id", hash_val)
+    state, _ds_count, warning = derive_lifecycle_state("test-id", hash_val)
     assert state == "COMPILED"
     assert warning is None
 
@@ -100,7 +100,7 @@ def test_lifecycle_compiled_with_artifact(clean_research):
 def test_lifecycle_corrupted_missing_artifact(clean_research):
     """Compiled hash but no artifact files → CORRUPTED."""
     from ui.services.promotion_reader import derive_lifecycle_state
-    state, warning = derive_lifecycle_state("test-id", "sha256:nonexistent")
+    state, _ds_count, warning = derive_lifecycle_state("test-id", "sha256:nonexistent")
     assert state == "CORRUPTED"
     assert warning is not None
 

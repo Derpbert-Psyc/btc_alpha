@@ -1,0 +1,22 @@
+{
+  "tier": "TRIAGE_PASSED",
+  "strategy_config_hash": "sha256:f1115584a43a1de2adff6bc4864a616f733142d74374b5abc5dc9fcd07b49886",
+  "composition_spec_hash": "sha256:test_spec_hash",
+  "dataset_prefix": "btcusdt_binance_spot_1m_2025-10-01_to_2025-12-31",
+  "runner_economics": {
+    "fee_rate": 0.0006,
+    "slippage_bps": 10,
+    "starting_capital": 10000
+  },
+  "triage_result_summary": {
+    "overall_pass": true,
+    "reason": "All tests passed",
+    "test_results": {
+      "test_1": {
+        "passed": true
+      }
+    },
+    "trade_count": 50
+  },
+  "timestamp": "2026-02-13T04:59:22.689034+00:00"
+}

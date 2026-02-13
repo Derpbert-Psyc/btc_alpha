@@ -16,7 +16,7 @@ def render_metadata_form(state, on_change: Callable):
             value=meta.get("thesis", ""),
             label="Thesis",
         ).classes("w-full").props("outlined")
-        thesis.on("change", lambda e: _update_meta(state, "thesis", e.value, on_change))
+        thesis.on("change", lambda e: _update_meta(state, "thesis", e.args, on_change))
 
         # Known risks
         ui.label("Known Risks").classes("text-sm font-bold mt-4")
@@ -24,7 +24,7 @@ def render_metadata_form(state, on_change: Callable):
         for i, risk in enumerate(risks):
             with ui.row().classes("w-full items-center gap-2"):
                 ri = ui.input(value=risk).classes("flex-grow").props("dense")
-                ri.on("change", lambda e, idx=i: _update_risk(state, idx, e.value, on_change))
+                ri.on("change", lambda e, idx=i: _update_risk(state, idx, e.args, on_change))
                 ui.button(icon="close",
                           on_click=lambda idx=i: _delete_risk(state, idx, on_change)).props(
                     "flat dense round size=sm color=negative")
@@ -38,13 +38,13 @@ def render_metadata_form(state, on_change: Callable):
         for i, p in enumerate(tsp):
             with ui.row().classes("w-full items-center gap-2"):
                 pi = ui.input(value=p.get("param", ""), label="Param").classes("w-48").props("dense")
-                pi.on("change", lambda e, idx=i: _update_tsp(state, idx, "param", e.value, on_change))
+                pi.on("change", lambda e, idx=i: _update_tsp(state, idx, "param", e.args, on_change))
                 di = ui.number(value=p.get("default", 0), label="Default").classes("w-24").props("dense")
-                di.on("change", lambda e, idx=i: _update_tsp(state, idx, "default", e.value, on_change))
+                di.on("change", lambda e, idx=i: _update_tsp(state, idx, "default", e.args, on_change))
                 mi = ui.number(value=p.get("min", 0), label="Min").classes("w-24").props("dense")
-                mi.on("change", lambda e, idx=i: _update_tsp(state, idx, "min", e.value, on_change))
+                mi.on("change", lambda e, idx=i: _update_tsp(state, idx, "min", e.args, on_change))
                 mx = ui.number(value=p.get("max", 0), label="Max").classes("w-24").props("dense")
-                mx.on("change", lambda e, idx=i: _update_tsp(state, idx, "max", e.value, on_change))
+                mx.on("change", lambda e, idx=i: _update_tsp(state, idx, "max", e.args, on_change))
                 ui.button(icon="close",
                           on_click=lambda idx=i: _delete_tsp(state, idx, on_change)).props(
                     "flat dense round size=sm color=negative")

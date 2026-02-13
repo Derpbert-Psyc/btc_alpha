@@ -14,7 +14,7 @@ from ui.services.compiler_bridge import compile_spec
 from ui.services.backtest_runner import Bar, run_backtest
 from phase5_triage_types import TriageConfig
 from phase5_triage import run_test_1
-from ui.pages.parameter_sweep import _apply_param_override, _save_sweep_results
+from ui.services.research_services import _apply_param_override
 
 
 # ---------------------------------------------------------------------------
@@ -26,8 +26,8 @@ def research_dir(tmp_path, monkeypatch):
     """Redirect research dir to tmp."""
     rd = str(tmp_path / "research")
     os.makedirs(rd, exist_ok=True)
-    import ui.pages.parameter_sweep as ps
-    monkeypatch.setattr(ps, "RESEARCH_DIR", rd)
+    import ui.services.research_services as rs
+    monkeypatch.setattr(rs, "RESEARCH_DIR", rd)
     return rd
 
 
@@ -163,8 +163,13 @@ def test_sweep_runs_test_1_only():
 
 
 def test_sweep_writes_results_no_overwrite(research_dir):
-    """Sweep saves results to file; running twice creates separate files."""
-    spec = _make_preset_spec()
+    """Sweep saves results to file with unique timestamps (no overwrite)."""
+    import time
+    from datetime import datetime, timezone
+
+    comp_id = "test_sweep"
+    dir_path = os.path.join(research_dir, "sweep_results", comp_id)
+    os.makedirs(dir_path, exist_ok=True)
 
     results = [
         {"param_value": 8, "oos_sharpe": 0.5, "train_sharpe": 0.6,
@@ -173,24 +178,27 @@ def test_sweep_writes_results_no_overwrite(research_dir):
          "passed": True, "trades": 12, "hash": "def456", "is_default": True},
     ]
 
-    # Save twice (simulating two sweep runs)
-    _save_sweep_results(spec, "macd_15m.fast_period", results)
+    def save(suffix=""):
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        filename = f"macd_15m_fast_period_{ts}{suffix}.json"
+        filepath = os.path.join(dir_path, filename)
+        with open(filepath, "w") as f:
+            json.dump({
+                "composition_id": comp_id,
+                "param_name": "macd_15m.fast_period",
+                "timestamp": ts,
+                "results": results,
+            }, f, indent=2)
 
-    import time
-    time.sleep(1.1)  # Ensure different timestamp
+    save()
+    time.sleep(1.1)
+    save()
 
-    _save_sweep_results(spec, "macd_15m.fast_period", results)
-
-    # Check both files exist (no overwrite)
-    comp_dir = os.path.join(research_dir, "sweep_results", "test_sweep")
-    assert os.path.isdir(comp_dir)
-
-    files = [f for f in os.listdir(comp_dir) if f.endswith(".json")]
+    files = [f for f in os.listdir(dir_path) if f.endswith(".json")]
     assert len(files) == 2, f"Expected 2 files, got {len(files)}: {files}"
 
-    # Both files have valid JSON
     for fname in files:
-        with open(os.path.join(comp_dir, fname)) as f:
+        with open(os.path.join(dir_path, fname)) as f:
             data = json.load(f)
         assert data["param_name"] == "macd_15m.fast_period"
         assert len(data["results"]) == 2

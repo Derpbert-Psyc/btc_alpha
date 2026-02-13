@@ -69,10 +69,14 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
         ui.separator()
         ui.label(f"Configure: {name}").classes("text-lg font-bold")
 
-        # Label
+        # Label — auto-generates from {name}_{timeframe}
+        label_manually_set = {"value": False}
         default_label = f"{name}_15m"
-        # Auto-suggest price_{tf} for EMA period=1
         label_input = ui.input(value=default_label, label="Instance Label").classes("w-full")
+
+        def _on_label_manual_edit(e):
+            label_manually_set["value"] = True
+        label_input.on("change", _on_label_manual_edit)
 
         # Timeframe — dual mode
         with ui.row().classes("w-full items-center gap-2"):
@@ -86,12 +90,13 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
             custom_unit = ui.select(["min", "hr", "day", "wk"], value="min").classes("w-20")
 
         def toggle_tf(e):
-            if e.value == "Custom":
+            if e.args == "Custom":
                 quick_tf.style("display: none")
                 custom_row.style("")
             else:
                 quick_tf.style("")
                 custom_row.style("display: none")
+            _update_auto_label()
         tf_mode.on("update:model-value", toggle_tf)
 
         # Role
@@ -121,18 +126,29 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
             inp = ui.number(value=pval, label=pname).classes("w-32")
             param_inputs[pname] = inp
 
-        # Auto-suggest label for EMA period=1
-        def check_ema_label():
+        # Auto-label generation: {name}_{tf}, or price_{tf} for EMA period=1
+        def _get_current_tf():
+            if tf_mode.value == "Quick":
+                return quick_tf.value
+            return f"{int(custom_val.value)}{custom_unit.value}"
+
+        def _update_auto_label(_=None):
+            if label_manually_set["value"]:
+                return
+            tf = _get_current_tf()
+            # Special case: EMA with period=1 → price_{tf}
             if indicator_id == 1 and "period" in param_inputs:
                 if param_inputs["period"].value == 1:
-                    tf = quick_tf.value if tf_mode.value == "Quick" else f"{int(custom_val.value)}{custom_unit.value}"
                     label_input.value = f"price_{tf}"
+                    return
+            label_input.value = f"{name}_{tf}"
 
-        if indicator_id == 1:
-            if "period" in param_inputs:
-                param_inputs["period"].on("change", lambda _: check_ema_label())
-            quick_tf.on("update:model-value", lambda _: check_ema_label())
-            check_ema_label()
+        # Wire auto-label to timeframe and parameter changes
+        quick_tf.on("update:model-value", _update_auto_label)
+        custom_val.on("change", _update_auto_label)
+        custom_unit.on("update:model-value", _update_auto_label)
+        if indicator_id == 1 and "period" in param_inputs:
+            param_inputs["period"].on("change", _update_auto_label)
 
         # Confirm / Cancel
         with ui.row().classes("w-full justify-end gap-2 mt-4"):
