@@ -8,8 +8,8 @@ PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 FROZEN_MANIFEST = {
     "composition_compiler_v1_5_2.py": "a6fda2fa5920d974c803d8087c33f0c31c8a32511247acaa6fb7273338c22118",
-    "strategy_framework_v1_8_0.py": "443a50bc3a2f9d5a2b8a97cf101165166de762eb7d3be184e259d25fef72e938",
-    "verify_framework_v1_8_0.py": "cc0b3b359241acf450a10a9b636b55fc2ed3f806309e08df0b0801d8e5b7dc2a",
+    "strategy_framework_v1_8_0.py": "799a59f19cbea6977db4fce2ca348e63e241b203260a361063fe7f1b52406ea9",
+    "verify_framework_v1_8_0.py": "b20cdeda5d8b7b6350230eb1b99faf69b5894d5492212c1b9fa0fb3e39e13b56",
     "phase5_bundle_store.py": "209b0b3bffb0dc130f2296b53ef55d618ff29c322fc369afd14e3dc0147a6a0a",
     "phase5_cli.py": "b8b65db9da3ba4003e62fbb85fe2d67b02db4b655cd2abd257e1887f4e0c7b7a",
     "phase5_integrated_runner.py": "96fd0350be035307ed16ead1ad2c00f270b1aa3e7f9d19e89ee04a1cb7492a28",
@@ -26,7 +26,7 @@ FROZEN_MANIFEST = {
     "SYSTEM_LAWS.md": "e817af5812770bc44b5d55d3b1dcb180d0c38d7129912bc6b9164dfe36626cef",
     "BYBIT_OMS_CONTRACT_v1_0_0.md": "920b984550d34362a0450da23ebd618e411c30a5b8871206e18a706694be4f2a",
     "PHASE2_INVARIANTS.md": "2b5ac60e63d38696c800ef3e6f47fc71ad1d064ea1af8f035b1311c633945a09",
-    "PHASE4A_INDICATOR_CONTRACT.md": "5394eea95b92c7231ae8ba5419de6b38849dbe7c9002e293b12879faa724d55c",
+    "PHASE4A_INDICATOR_CONTRACT.md": "0db864460311feeec16ab18553f87f79a513efe4afeb9c612f03fcfa31b5cabe",
     "PHASE4B_CONTRACT_LOCKED.md": "03c4628253698403c761e9a4a398b61ee624532452b9b0cad6a0e1194c09bc91",
     "PHASE5_INTEGRATION_SEAMS_v1_2_3.md": "b02857b543e9af536cf733924403c61c1b88bca4a4a38ca91ff00d49606c1b70",
     "PHASE5_INTEGRATION_SEAMS_v1_2_6.md": "056570dcffc445ad005ec48a25b14d8092263cd33ebc19e299cc668983fcc9cd",

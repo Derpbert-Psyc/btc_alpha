@@ -3,6 +3,8 @@
 The reference implementation is self-contained (no external TA libs).
 Verifies that the backtest runner's MACD matches the TradingView-style
 EMA-with-SMA-seed specification from MACD_CONFLUENCE_STRATEGY_CONTRACT v1.7.0 §2.1.
+
+Includes signal_slope_sign tests (framework-derived output, same precedent as slope_sign).
 """
 
 import math
@@ -41,7 +43,7 @@ def ref_ema(closes: list, period: int) -> list:
 def ref_macd(closes: list, fast: int = 12, slow: int = 26, signal: int = 9):
     """MACD with SMA-seeded EMA — reference implementation.
 
-    Returns: (macd_line, signal_line, histogram, slope_sign) — all lists.
+    Returns: (macd_line, signal_line, histogram, slope_sign, signal_slope_sign).
     """
     fast_ema = ref_ema(closes, fast)
     slow_ema = ref_ema(closes, slow)
@@ -52,7 +54,6 @@ def ref_macd(closes: list, fast: int = 12, slow: int = 26, signal: int = 9):
         if fast_ema[i] is not None and slow_ema[i] is not None:
             macd_line[i] = fast_ema[i] - slow_ema[i]
 
-    # Signal = EMA of non-None MACD values
     macd_vals = [v for v in macd_line if v is not None]
     sig_ema = ref_ema(macd_vals, signal) if len(macd_vals) >= signal else [None] * len(macd_vals)
 
@@ -73,7 +74,13 @@ def ref_macd(closes: list, fast: int = 12, slow: int = 26, signal: int = 9):
             diff = macd_line[i] - macd_line[i - 1]
             slope_sign[i] = 1 if diff > 0 else (-1 if diff < 0 else 0)
 
-    return macd_line, signal_line, histogram, slope_sign
+    signal_slope_sign = [None] * n
+    for i in range(1, n):
+        if signal_line[i] is not None and signal_line[i - 1] is not None:
+            diff = signal_line[i] - signal_line[i - 1]
+            signal_slope_sign[i] = 1 if diff > 0 else (-1 if diff < 0 else 0)
+
+    return macd_line, signal_line, histogram, slope_sign, signal_slope_sign
 
 
 # ---------------------------------------------------------------------------
@@ -88,13 +95,9 @@ class TestEMASMASeed:
         period = 10
         ema = compute_ema(closes, period)
         ref = ref_ema(closes, period)
-
-        # First non-None value should be SMA of first 10 values
-        expected_sma = sum(closes[:10]) / 10  # = 5.5
+        expected_sma = sum(closes[:10]) / 10
         assert ema[9] is not None
         assert abs(ema[9] - expected_sma) < 1e-10, f"EMA seed {ema[9]} != SMA {expected_sma}"
-
-        # All subsequent values should match reference
         for i in range(10, 50):
             assert abs(ema[i] - ref[i]) < 1e-10, f"EMA mismatch at {i}: {ema[i]} vs {ref[i]}"
 
@@ -111,55 +114,85 @@ class TestMACDCorrectness:
     """Verify MACD values match reference implementation within 1e-10."""
 
     def test_macd_matches_reference_100_bars(self):
-        """100-bar synthetic series — MACD(12,26,9) must match reference."""
-        # Synthetic price: oscillating + trend
         closes = [100.0 + 0.5 * i + 3.0 * math.sin(i * 0.3) for i in range(100)]
-
-        ml, sl, hist, ss = compute_macd(closes, 12, 26, 9)
-        rml, rsl, rhist, rss = ref_macd(closes, 12, 26, 9)
-
+        ml, sl, hist, ss, sss = compute_macd(closes, 12, 26, 9)
+        rml, rsl, rhist, rss, rsss = ref_macd(closes, 12, 26, 9)
         for i in range(100):
-            # MACD line
             if rml[i] is not None:
                 assert ml[i] is not None, f"MACD line None at {i} but ref is {rml[i]}"
-                assert abs(ml[i] - rml[i]) < 1e-10, f"MACD line mismatch at {i}: {ml[i]} vs {rml[i]}"
-            # Signal line
+                assert abs(ml[i] - rml[i]) < 1e-10
             if rsl[i] is not None:
-                assert sl[i] is not None, f"Signal line None at {i} but ref is {rsl[i]}"
-                assert abs(sl[i] - rsl[i]) < 1e-10, f"Signal line mismatch at {i}: {sl[i]} vs {rsl[i]}"
-            # Histogram
+                assert sl[i] is not None
+                assert abs(sl[i] - rsl[i]) < 1e-10
             if rhist[i] is not None:
                 assert hist[i] is not None
                 assert abs(hist[i] - rhist[i]) < 1e-10
-            # Slope sign
             if rss[i] is not None:
-                assert ss[i] == rss[i], f"slope_sign mismatch at {i}: {ss[i]} vs {rss[i]}"
+                assert ss[i] == rss[i], f"slope_sign mismatch at {i}"
+            if rsss[i] is not None:
+                assert sss[i] == rsss[i], f"signal_slope_sign mismatch at {i}"
 
     def test_macd_slope_sign_transitions(self):
-        """Verify slope_sign transitions at inflection points."""
-        # Strong downtrend then strong uptrend — sharp V-shape
         closes = [200.0 - 2.0 * i for i in range(60)] + [80.0 + 2.0 * i for i in range(60)]
-
-        ml, _, _, ss = compute_macd(closes, 12, 26, 9)
-
-        # Find any transition from negative/zero to positive slope
-        found_neg_to_pos = False
-        for i in range(1, len(ss)):
-            if ss[i - 1] is not None and ss[i] is not None:
-                if ss[i - 1] <= 0 and ss[i] == 1:
-                    found_neg_to_pos = True
-                    break
-        assert found_neg_to_pos, (
-            "Expected a slope_sign <=0 → +1 transition. "
-            f"Slope values: {[s for s in ss if s is not None]}"
+        ml, _, _, ss, _ = compute_macd(closes, 12, 26, 9)
+        found = any(
+            ss[i - 1] is not None and ss[i] is not None and ss[i - 1] <= 0 and ss[i] == 1
+            for i in range(1, len(ss))
         )
+        assert found, "Expected slope_sign <=0 -> +1 transition"
 
     def test_macd_values_with_constant_price(self):
-        """Constant price → MACD should converge to 0."""
         closes = [100.0] * 100
-        ml, sl, hist, ss = compute_macd(closes, 12, 26, 9)
-
-        # After warmup, MACD line should be exactly 0 (fast EMA == slow EMA)
+        ml, sl, hist, ss, sss = compute_macd(closes, 12, 26, 9)
         for i in range(26, 100):
             if ml[i] is not None:
                 assert abs(ml[i]) < 1e-10, f"MACD line should be 0 at {i}, got {ml[i]}"
+
+
+class TestSignalSlopeSign:
+    """Verify signal_slope_sign (framework-derived output)."""
+
+    def test_signal_slope_sign_matches_reference(self):
+        closes = [100.0 + 0.5 * i + 3.0 * math.sin(i * 0.3) for i in range(100)]
+        _, _, _, _, sss = compute_macd(closes, 12, 26, 9)
+        _, _, _, _, rsss = ref_macd(closes, 12, 26, 9)
+        for i in range(100):
+            if rsss[i] is not None:
+                assert sss[i] == rsss[i], f"signal_slope_sign mismatch at {i}"
+
+    def test_signal_slope_sign_warmup_suppression(self):
+        closes = [100.0 + 0.5 * i for i in range(100)]
+        _, _, _, _, sss = compute_macd(closes, 12, 26, 9)
+        for i in range(34):
+            assert sss[i] is None, f"signal_slope_sign[{i}] should be None during warmup"
+        assert sss[34] is not None, "signal_slope_sign[34] should be non-None"
+
+    def test_signal_slope_sign_constant_price(self):
+        closes = [100.0] * 100
+        _, _, _, _, sss = compute_macd(closes, 12, 26, 9)
+        for i in range(100):
+            if sss[i] is not None:
+                assert sss[i] == 0, f"signal_slope_sign should be 0 at {i}, got {sss[i]}"
+
+    def test_signal_slope_sign_v_shape_transition(self):
+        closes = [200.0 - 2.0 * i for i in range(60)] + [80.0 + 2.0 * i for i in range(60)]
+        _, _, _, _, sss = compute_macd(closes, 12, 26, 9)
+        found = any(
+            sss[i - 1] is not None and sss[i] is not None and sss[i - 1] <= 0 and sss[i] == 1
+            for i in range(1, len(sss))
+        )
+        assert found, "Expected signal_slope_sign <=0 -> +1 transition"
+
+    def test_existing_outputs_unchanged(self):
+        closes = [100.0 + 0.5 * i + 3.0 * math.sin(i * 0.3) for i in range(100)]
+        ml, sl, hist, ss, _ = compute_macd(closes, 12, 26, 9)
+        rml, rsl, rhist, rss, _ = ref_macd(closes, 12, 26, 9)
+        for i in range(100):
+            if rml[i] is not None:
+                assert abs(ml[i] - rml[i]) < 1e-10, f"macd_line changed at {i}"
+            if rsl[i] is not None:
+                assert abs(sl[i] - rsl[i]) < 1e-10, f"signal_line changed at {i}"
+            if rhist[i] is not None:
+                assert abs(hist[i] - rhist[i]) < 1e-10, f"histogram changed at {i}"
+            if rss[i] is not None:
+                assert ss[i] == rss[i], f"slope_sign changed at {i}"

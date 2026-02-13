@@ -245,8 +245,9 @@ def compute_atr(highs: List[float], lows: List[float], closes: List[float],
 def compute_macd(closes: List[float], fast: int = 12, slow: int = 26,
                  signal: int = 9) -> Tuple[
                      List[Optional[float]], List[Optional[float]],
-                     List[Optional[float]], List[Optional[float]]]:
-    """Compute MACD: macd_line, signal_line, histogram, slope_sign."""
+                     List[Optional[float]], List[Optional[float]],
+                     List[Optional[float]]]:
+    """Compute MACD: macd_line, signal_line, histogram, slope_sign, signal_slope_sign."""
     fast_ema = compute_ema(closes, fast)
     slow_ema = compute_ema(closes, slow)
 
@@ -278,7 +279,76 @@ def compute_macd(closes: List[float], fast: int = 12, slow: int = 26,
             diff = macd_line[i] - macd_line[i - 1]
             slope_sign[i] = 1 if diff > 0 else (-1 if diff < 0 else 0)
 
-    return macd_line, signal_line, histogram, slope_sign
+    # Signal slope sign: 1 if signal rising, -1 if falling, 0 if flat
+    signal_slope_sign = [None] * n
+    for i in range(1, n):
+        if signal_line[i] is not None and signal_line[i - 1] is not None:
+            diff = signal_line[i] - signal_line[i - 1]
+            signal_slope_sign[i] = 1 if diff > 0 else (-1 if diff < 0 else 0)
+
+    return macd_line, signal_line, histogram, slope_sign, signal_slope_sign
+
+
+def compute_lmagr(closes: List[float], ma_length: int = 20) -> Tuple[
+                      List[Optional[int]], List[Optional[int]]]:
+    """Compute LMAGR (Log MA Gap Ratio): lmagr, lmagr_pct.
+
+    Mirrors Phase 4B LMAGRIndicator (indicator 25) math exactly:
+    - First-price-seeded EMA (NOT SMA-seeded; do NOT call compute_ema()).
+    - Integer fixed-point EMA with SCALE_FACTOR = 10^10.
+    - PRICE-scaled inputs (close in cents).
+    - Outputs are integer-scaled by RATE_SCALE = 1,000,000.
+    - int() truncation, not round().
+
+    Returns: (lmagr_list, lmagr_pct_list) — parallel to closes.
+    """
+    n = len(closes)
+    lmagr_list: List[Optional[int]] = [None] * n
+    lmagr_pct_list: List[Optional[int]] = [None] * n
+
+    SCALE_FACTOR = 10_000_000_000
+    RATE_SCALE = 1_000_000
+    k_scaled = (2 * SCALE_FACTOR) // (ma_length + 1)
+
+    ema_value: Optional[int] = None
+    bars_seen = 0
+
+    for i in range(n):
+        close_int = int(round(closes[i] * 100))  # PRICE-scaled (cents)
+
+        # Gate: invalid close does not mutate state
+        if close_int <= 0:
+            continue
+
+        bars_seen += 1
+
+        # Update EMA — first-price-seeded (NOT SMA-seeded)
+        if ema_value is None:
+            ema_value = close_int
+        else:
+            ema_value = (
+                close_int * k_scaled + ema_value * (SCALE_FACTOR - k_scaled)
+            ) // SCALE_FACTOR
+
+        # Warmup check
+        if bars_seen < ma_length:
+            continue
+
+        if ema_value <= 0:
+            continue
+
+        # Compute LMAGR = ln(close / EMA)
+        ratio = close_int / ema_value
+        if ratio <= 0:
+            continue
+
+        lmagr_float = math.log(ratio)
+        lmagr_list[i] = int(lmagr_float * RATE_SCALE)
+
+        # Percentage form: (close/EMA - 1)
+        lmagr_pct_list[i] = int((ratio - 1.0) * RATE_SCALE)
+
+    return lmagr_list, lmagr_pct_list
 
 
 def compute_bollinger(closes: List[float], period: int = 20,
@@ -438,11 +508,12 @@ def compute_indicator_outputs(
         fast = params.get("fast_period", params.get("fast", 12))
         slow = params.get("slow_period", params.get("slow", 26))
         sig = params.get("signal_period", params.get("signal", 9))
-        ml, sl, hist, ss = compute_macd(closes, fast, slow, sig)
+        ml, sl, hist, ss, sss = compute_macd(closes, fast, slow, sig)
         result["macd_line"] = ml
         result["signal_line"] = sl
         result["histogram"] = hist
         result["slope_sign"] = ss
+        result["signal_slope_sign"] = sss
 
     elif ind_id == 8:  # ROC
         period = params.get("period", 14)
@@ -476,6 +547,12 @@ def compute_indicator_outputs(
         result["upper"] = upper
         result["lower"] = lower
         result["basis"] = basis
+
+    elif ind_id == 25:  # LMAGR (diagnostic probe)
+        ma_length = params.get("ma_length", params.get("period", params.get("length", 20)))
+        lmagr, lmagr_pct = compute_lmagr(closes, ma_length)
+        result["lmagr"] = lmagr
+        result["lmagr_pct"] = lmagr_pct
 
     else:
         # Stub: return None for all outputs

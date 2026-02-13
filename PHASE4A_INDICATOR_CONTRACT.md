@@ -809,6 +809,8 @@ TradingView does not have a built-in equity drawdown indicator. This is a custom
 | macd_line | PRICE | EMA(fast) - EMA(slow) |
 | signal_line | PRICE | EMA of macd_line |
 | histogram | PRICE | macd_line - signal_line |
+| slope_sign | RATE | Sign of bar-over-bar delta of macd_line (framework-derived) |
+| signal_slope_sign | RATE | Sign of bar-over-bar delta of signal_line (framework-derived) |
 
 ### Max Lookback
 **Exact formula**: `slow_length + signal_length - 1` bars
@@ -859,6 +861,10 @@ First valid: same as Signal line
 - **First valid index**: t = slow_length + signal_length - 2
 
 **Partial validity**: MACD_line is valid before Signal_line. However, for contract simplicity, all outputs return None until all are valid.
+
+**Framework-derived output warmup** (computed by framework, not Phase 4B):
+- `slope_sign`: `slow_length + 1` bars
+- `signal_slope_sign`: `slow_length + signal_length` bars
 
 ### Time Alignment
 All outputs at bar t reflect price data through bar t inclusive. MACD_line incorporates the current bar's close.

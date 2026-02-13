@@ -1,7 +1,7 @@
 """
 Acceptance tests for Strategy Framework v1.8.0 and Composition Compiler v1.5.2.
 
-47 delta acceptance tests + 4 composition proofs.
+57 delta acceptance tests + 4 composition proofs.
 
 Delta 1: is_present / is_absent operators        (10 tests)
 Delta 2: MTM_DRAWDOWN_EXIT                       (10 tests)
@@ -9,9 +9,10 @@ Delta 3: Per-output warmup                       (10 tests)
 Delta 4: HANDOFF gate policy                     (12 tests)
 Delta 5: Cross-indicator condition references    (8 tests)
 Delta 6: Schema strictness                       (4 tests — reduced from table)
+Delta 7: signal_slope_sign + LMAGR wiring        (10 tests)
 Composition Proofs                               (4 proofs)
                                                   --------
-Total:                                            54 tests + proofs
+Total:                                            68 tests + proofs
 """
 
 from __future__ import annotations
@@ -1332,6 +1333,85 @@ def test_proof_4():
 
 
 # ---------------------------------------------------------------------------
+# Delta 7: signal_slope_sign + LMAGR wiring
+# ---------------------------------------------------------------------------
+
+def test_d7_t1():
+    """MACD signal_slope_sign warmup = slow + signal = 35."""
+    result = get_warmup_bars_for_output(
+        7, "signal_slope_sign", {"slow": 26, "signal": 9})
+    _assert_eq(result, 35, "signal_slope_sign warmup")
+
+
+def test_d7_t2():
+    """Instance using signal_line + signal_slope_sign: warmup = max(34, 35) = 35."""
+    result = compute_instance_warmup(
+        7, ["signal_line", "signal_slope_sign"], {"slow": 26, "signal": 9})
+    _assert_eq(result, 35, "Instance warmup with signal_line + signal_slope_sign")
+
+
+def test_d7_t3():
+    """signal_slope_sign at bar 33 (34th bar) -> not warmed up."""
+    _assert(not is_output_warmed_up(
+        7, "signal_slope_sign", {"slow": 26, "signal": 9}, 33),
+        "Bar 33 should not satisfy warmup of 35")
+
+
+def test_d7_t4():
+    """signal_slope_sign at bar 34 (35th bar) -> warmed up."""
+    _assert(is_output_warmed_up(
+        7, "signal_slope_sign", {"slow": 26, "signal": 9}, 34),
+        "Bar 34 should satisfy warmup of 35")
+
+
+def test_d7_t5():
+    """LMAGR warmup: get_warmup_bars_for_output(25, 'lmagr', {ma_length: 20}) = 20."""
+    result = get_warmup_bars_for_output(25, "lmagr", {"ma_length": 20})
+    _assert_eq(result, 20, "LMAGR lmagr warmup")
+
+
+def test_d7_t6():
+    """LMAGR warmup: lmagr_pct also = 20."""
+    result = get_warmup_bars_for_output(25, "lmagr_pct", {"ma_length": 20})
+    _assert_eq(result, 20, "LMAGR lmagr_pct warmup")
+
+
+def test_d7_t7():
+    """LMAGR determinism: two runs of is_output_warmed_up produce identical sequences."""
+    params = {"ma_length": 20}
+    r1 = [is_output_warmed_up(25, "lmagr", params, i) for i in range(25)]
+    r2 = [is_output_warmed_up(25, "lmagr", params, i) for i in range(25)]
+    _assert_eq(r1, r2, "LMAGR warmup gating determinism")
+
+
+def test_d7_t8():
+    """LMAGR name resolution: get_warmup_bars_for_output('lmagr', ...) works."""
+    result = get_warmup_bars_for_output("lmagr", "lmagr", {"ma_length": 10})
+    _assert_eq(result, 10, "LMAGR string name resolution warmup")
+
+
+def test_d7_t9():
+    """Config with LMAGR indicator instance validates without errors."""
+    inst = _make_indicator_instance(
+        label="stretch",
+        indicator_id="lmagr",
+        outputs_used=["lmagr"],
+        parameters={"ma_length": 20})
+    config = _make_minimal_config(
+        indicator_instances=[inst],
+        exit_rules=[_make_exit_rule()])
+    errors = validate_config(config)
+    _assert(not errors, f"LMAGR config should be valid: {errors}")
+
+
+def test_d7_t10():
+    """signal_slope_sign with non-default params: slow=20, signal=5 -> warmup=25."""
+    result = get_warmup_bars_for_output(
+        7, "signal_slope_sign", {"slow": 20, "signal": 5})
+    _assert_eq(result, 25, "signal_slope_sign warmup with custom params")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1410,6 +1490,18 @@ def main():
     _run_test("D6-T2", test_d6_t2)
     _run_test("D6-T3", test_d6_t3)
     _run_test("D6-T4", test_d6_t4)
+
+    print("\n--- Delta 7: signal_slope_sign + LMAGR wiring ---")
+    _run_test("D7-T1", test_d7_t1)
+    _run_test("D7-T2", test_d7_t2)
+    _run_test("D7-T3", test_d7_t3)
+    _run_test("D7-T4", test_d7_t4)
+    _run_test("D7-T5", test_d7_t5)
+    _run_test("D7-T6", test_d7_t6)
+    _run_test("D7-T7", test_d7_t7)
+    _run_test("D7-T8", test_d7_t8)
+    _run_test("D7-T9", test_d7_t9)
+    _run_test("D7-T10", test_d7_t10)
 
     print("\n--- Composition Proofs ---")
     _run_test("Proof-1", test_proof_1)

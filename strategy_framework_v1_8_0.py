@@ -127,10 +127,12 @@ def version_gte(v1: str, v2: str) -> bool:
 #   macd_line:   slow_length bars
 #   signal_line: slow_length + signal_length - 1 bars
 #   histogram:   slow_length + signal_length - 1 bars
-#   slope_sign:  slow_length + 1 bars  (derivative of macd_line)
+#   slope_sign:         slow_length + 1 bars  (derivative of macd_line)
+#   signal_slope_sign:  slow_length + signal_length bars  (derivative of signal_line)
 #
-# The slope_sign output is computed by the framework as the sign of the
-# bar-over-bar delta of macd_line.  It is not a native Phase 4B output.
+# The slope_sign and signal_slope_sign outputs are computed by the framework
+# as the sign of the bar-over-bar delta of macd_line and signal_line
+# respectively.  They are not native Phase 4B outputs.
 
 # Indicator name -> integer ID mapping (composition uses string names)
 INDICATOR_NAME_TO_ID: Dict[str, int] = {
@@ -141,6 +143,7 @@ INDICATOR_NAME_TO_ID: Dict[str, int] = {
     "vol_targeting": 17, "vrvp": 18, "rs_ratio": 19,
     "correlation": 20, "beta": 21, "dd_price": 22,
     "dd_per_trade": 23, "dd_metrics": 24,
+    "lmagr": 25,
 }
 
 # Reverse mapping
@@ -158,7 +161,8 @@ INDICATOR_OUTPUTS: Dict[int, Dict[str, str]] = {
     5: {"avwap": "PRICE"},
     6: {"equity_dd": "RATE", "equity_dd_duration": "RATE"},
     7: {"macd_line": "PRICE", "signal_line": "PRICE", "histogram": "PRICE",
-        "slope_sign": "RATE"},  # slope_sign = framework-computed derivative
+        "slope_sign": "RATE",
+        "signal_slope_sign": "RATE"},  # slope_sign, signal_slope_sign = framework-computed derivatives
     8: {"roc": "RATE"},
     9: {"adx": "RATE", "plus_di": "RATE", "minus_di": "RATE"},
     10: {"choppiness": "RATE"},
@@ -182,7 +186,7 @@ INDICATOR_OUTPUTS: Dict[int, Dict[str, str]] = {
 
 # Diagnostic probes (IDs 25-29) -- output sets
 DIAGNOSTIC_OUTPUTS: Dict[int, Dict[str, str]] = {
-    25: {"spread_bps": "RATE"},
+    25: {"lmagr": "RATE", "lmagr_pct": "RATE"},
     26: {"funding_rate": "RATE"},
     27: {"oi_change": "RATE"},
     28: {"volume_profile": "RATE"},
@@ -203,6 +207,9 @@ def _macd_output_warmup(output: str, params: dict) -> int:
     elif output == "slope_sign":
         # Derivative of macd_line: needs one extra bar
         return slow + 1
+    elif output == "signal_slope_sign":
+        # Derivative of signal_line: signal warmup + 1 extra bar
+        return slow + signal
     else:
         raise ValueError(f"Unknown MACD output: {output!r}")
 
@@ -223,6 +230,15 @@ def _bollinger_output_warmup(output: str, params: dict) -> int:
     length = params.get("length", params.get("period", 20))
     # All Bollinger outputs have the same warmup
     return length
+
+
+def _lmagr_output_warmup(output: str, params: dict) -> int:
+    """Per-output warmup for LMAGR (indicator 25)."""
+    length = params.get("ma_length", params.get("length", params.get("period", 20)))
+    if output in ("lmagr", "lmagr_pct"):
+        return length
+    else:
+        raise ValueError(f"Unknown LMAGR output: {output!r}")
 
 
 def _generic_warmup(indicator_id: int, params: dict) -> int:
@@ -293,6 +309,7 @@ _PER_OUTPUT_INDICATORS: Dict[int, Any] = {
     7: _macd_output_warmup,
     9: _adx_output_warmup,
     11: _bollinger_output_warmup,
+    25: _lmagr_output_warmup,
 }
 
 

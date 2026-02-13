@@ -180,7 +180,7 @@ class TestCrossesAbove:
         # This is implicitly tested by test_crosses_above_produces_entries,
         # but we verify the mechanism by checking MACD slope transitions exist
         closes = [100.0 + i for i in range(100)] + [200.0 - i for i in range(100)]
-        ml, _, _, ss = compute_macd(closes, 5, 10, 3)
+        ml, _, _, ss, _ = compute_macd(closes, 5, 10, 3)
 
         # Must have at least one transition from <=0 to >0
         transitions = 0
