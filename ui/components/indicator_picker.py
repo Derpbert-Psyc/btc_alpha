@@ -98,10 +98,19 @@ async def show_indicator_picker(
         config_container = ui.column().classes("w-full")
 
         # Group tabs
+        GROUP_COLORS = {
+            "Trend": "group-trend", "Momentum": "group-momentum",
+            "Volatility": "group-volatility", "Volume": "group-volume",
+            "Support/Resistance": "group-sr", "Price": "group-price",
+        }
         with ui.tabs().classes("w-full") as group_tabs:
             tabs = {}
             for g in groups:
-                tabs[g["name"]] = ui.tab(g["name"])
+                tab = ui.tab(g["name"])
+                color_cls = GROUP_COLORS.get(g["name"])
+                if color_cls:
+                    tab.classes(color_cls)
+                tabs[g["name"]] = tab
 
         with ui.tab_panels(group_tabs).classes("w-full"):
             for g in groups:
@@ -160,28 +169,30 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
                 label_error.text = ""
                 add_btn.props(remove="disable")
 
-        # Timeframe — dual mode
+        # Timeframe — dual mode (handler defined before toggle, forward refs OK for async)
+        def toggle_tf(e):
+            is_custom = e.value == "Custom"
+            quick_tf.set_visibility(not is_custom)
+            custom_row.set_visibility(is_custom)
+            _update_auto_label()
+
         with ui.row().classes("w-full items-center gap-2"):
             ui.label("Timeframe:").classes("text-sm")
-            tf_mode = ui.toggle(["Quick", "Custom"], value="Quick").props("dense")
+            tf_mode = ui.toggle(["Quick", "Custom"], value="Quick",
+                                on_change=toggle_tf).props("dense")
 
-        quick_tf = ui.select(QUICK_TIMEFRAMES, value="15m", label="Timeframe").classes("w-32")
-        custom_row = ui.row().classes("gap-2 items-center").style("display: none")
+        quick_tf = ui.select(
+            QUICK_TIMEFRAMES, value="15m", label="Timeframe",
+            on_change=lambda e: _update_auto_label(),
+        ).classes("w-32")
+        custom_row = ui.row().classes("gap-2 items-center")
+        custom_row.set_visibility(False)
         with custom_row:
             custom_val = ui.number(value=15, min=1, label="Value").classes("w-20")
-            custom_unit = ui.select(["min", "hr", "day", "wk"], value="min").classes("w-20")
-
-        def toggle_tf(e):
-            # Read from element .value (mapped by NiceGUI), not raw e.args
-            mode = tf_mode.value
-            if mode == "Custom":
-                quick_tf.style("display: none")
-                custom_row.style("")
-            else:
-                quick_tf.style("")
-                custom_row.style("display: none")
-            _update_auto_label()
-        tf_mode.on("update:model-value", toggle_tf)
+            custom_unit = ui.select(
+                ["min", "hr", "day", "wk"], value="min",
+                on_change=lambda e: _update_auto_label(),
+            ).classes("w-20")
 
         # Role
         role_select = ui.select(ROLES, value="trigger", label="Role").classes("w-32")
@@ -227,10 +238,8 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
             label_input.value = _unique_label(base, existing_labels)
             label_error.text = ""
 
-        # Wire auto-label to timeframe and parameter changes
-        quick_tf.on("update:model-value", _update_auto_label)
+        # Wire auto-label to parameter changes (timeframe already wired via on_change=)
         custom_val.on("change", _update_auto_label)
-        custom_unit.on("update:model-value", _update_auto_label)
         for pname, inp in param_inputs.items():
             inp.on("change", _update_auto_label)
 

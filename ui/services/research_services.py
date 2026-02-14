@@ -312,6 +312,87 @@ def write_promotion_for_composition(
     return filepath
 
 
+def write_lifecycle_promotion(
+    strategy_config_hash: str,
+    composition_spec_hash: str,
+    dataset_prefix: str,
+    lifecycle_tier: str,
+    runner_economics: Optional[Dict[str, Any]] = None,
+    notes: str = "",
+) -> str:
+    """Write a lifecycle promotion artifact (SHADOW_VALIDATED, LIVE_APPROVED).
+
+    Unlike write_promotion_for_composition (triage-based, letter-grade tiers),
+    this writes pure lifecycle transitions.
+    Returns file path.
+    """
+    valid_tiers = {"SHADOW_VALIDATED", "LIVE_APPROVED"}
+    if lifecycle_tier not in valid_tiers:
+        raise ValueError(f"Invalid lifecycle tier: {lifecycle_tier}. Must be one of {valid_tiers}")
+    if not strategy_config_hash:
+        raise ValueError("strategy_config_hash is required")
+
+    hash_val = strategy_config_hash
+    if hash_val.startswith("sha256:"):
+        hash_val = hash_val[7:]
+
+    promotions_dir = os.path.join(RESEARCH_DIR, "promotions", hash_val)
+    os.makedirs(promotions_dir, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+    ts_file = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ds = dataset_prefix or "manual"
+    filename = f"{lifecycle_tier}_PASS_{ds}_{ts_file}.json"
+    filepath = os.path.join(promotions_dir, filename)
+
+    artifact = {
+        "tier": lifecycle_tier,
+        "strategy_config_hash": strategy_config_hash,
+        "composition_spec_hash": composition_spec_hash,
+        "dataset_prefix": ds,
+        "runner_economics": runner_economics or {},
+        "triage_result_summary": {"promoted_via": "lifecycle_promotion", "notes": notes},
+        "timestamp": timestamp,
+    }
+
+    with open(filepath, "w") as f:
+        json.dump(artifact, f, indent=2, default=str)
+
+    return filepath
+
+
+# ---------------------------------------------------------------------------
+# Load latest triage result from disk
+# ---------------------------------------------------------------------------
+
+def load_latest_triage_result(strategy_config_hash: str) -> Optional[Dict[str, Any]]:
+    """Load the most recent triage result JSON for a strategy hash.
+
+    Returns the parsed dict or None if no results exist.
+    Sorted by filename (which contains timestamp) descending.
+    """
+    hash_val = strategy_config_hash
+    if hash_val.startswith("sha256:"):
+        hash_val = hash_val[7:]
+
+    dir_path = os.path.join(RESEARCH_DIR, "triage_results", hash_val)
+    if not os.path.isdir(dir_path):
+        return None
+
+    files = sorted(
+        [f for f in os.listdir(dir_path) if f.endswith(".json")],
+        reverse=True,
+    )
+    if not files:
+        return None
+
+    try:
+        with open(os.path.join(dir_path, files[0])) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Run Sweep — the service function called by UI [Parameter Sweep] button
 # ---------------------------------------------------------------------------

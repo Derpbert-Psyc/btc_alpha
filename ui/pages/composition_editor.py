@@ -12,6 +12,8 @@ from ui.services.composition_store import (
     load_composition,
     save_composition,
     update_compiled_hash,
+    save_last_compilation,
+    load_last_compilation,
 )
 from ui.services.compiler_bridge import compile_spec, save_artifacts, get_capability_registry
 from ui.services.indicator_catalog import (
@@ -114,9 +116,32 @@ class EditorState:
         self.last_compilation = None
         self.unsaved = False
         self.active_tab = "Indicators"  # persists across re-renders
+        self.active_entry_direction = "LONG"  # persists LONG/SHORT sub-tab
 
-    def mark_changed(self):
+    @property
+    def locked(self) -> bool:
+        """Strategy is locked if promoted to SHADOW_VALIDATED or beyond."""
+        if not hasattr(self, "_locked_cache"):
+            self._locked_cache = None
+        if self._locked_cache is None:
+            from ui.services.promotion_reader import derive_lifecycle_state
+            from ui.services.composition_store import load_index
+            index = load_index()
+            entry = index.get("compositions", {}).get(self.composition_id, {})
+            compiled_hash = entry.get("latest_compiled_hash")
+            if not compiled_hash:
+                self._locked_cache = False
+            else:
+                lifecycle, _, _ = derive_lifecycle_state(self.composition_id, compiled_hash)
+                self._locked_cache = lifecycle in ("SHADOW_VALIDATED", "LIVE_APPROVED")
+        return self._locked_cache
+
+    def mark_changed(self, affects_compilation: bool = True):
         self.unsaved = True
+        if affects_compilation and self.last_compilation is not None:
+            self.last_compilation = None
+            from ui.services.composition_store import delete_last_compilation
+            delete_last_compilation(self.composition_id)
 
     def save_to_disk(self):
         save_composition(self.composition_id, self.working_spec)
@@ -126,6 +151,9 @@ class EditorState:
     def revert(self):
         self.working_spec = copy.deepcopy(self.disk_spec)
         self.unsaved = False
+        # Reload saved compilation (revert may restore a compilable state)
+        saved = load_last_compilation(self.composition_id)
+        self.last_compilation = saved
 
     def compile(self):
         """Compile the current working spec (in-memory, not disk)."""
@@ -148,6 +176,10 @@ def composition_editor_page(composition_id: str):
             return
         _resolve_role_conditions(spec)
         state = EditorState(composition_id, spec)
+        # Load saved compilation from disk if available
+        saved_compilation = load_last_compilation(composition_id)
+        if saved_compilation is not None:
+            state.last_compilation = saved_compilation
         _editor_states[composition_id] = state
 
     with ui.column().classes("w-full max-w-7xl mx-auto p-4"):
@@ -162,12 +194,12 @@ def composition_editor_page(composition_id: str):
 
         # Tabbed panels
         with ui.tabs().classes("w-full") as tabs:
-            tab_ind = ui.tab("Indicators")
-            tab_entry = ui.tab("Entry Rules")
-            tab_exit = ui.tab("Exit Rules")
-            tab_gate = ui.tab("Gates")
-            tab_exec = ui.tab("Execution")
-            tab_meta = ui.tab("Metadata")
+            tab_ind = ui.tab("Indicators").classes("tab-indicators")
+            tab_entry = ui.tab("Entry Rules").classes("tab-entry")
+            tab_exit = ui.tab("Exit Rules").classes("tab-exit")
+            tab_gate = ui.tab("Gates").classes("tab-gates")
+            tab_exec = ui.tab("Execution").classes("tab-execution")
+            tab_meta = ui.tab("Metadata").classes("tab-metadata")
 
         tab_map = {
             "Indicators": tab_ind, "Entry Rules": tab_entry,
@@ -212,7 +244,6 @@ def _render_header(state: EditorState):
     with ui.row().classes("w-full items-center justify-between mb-2"):
         with ui.row().classes("items-center gap-4"):
             def _go_back():
-                _editor_states.pop(state.composition_id, None)
                 ui.navigate.to("/")
             ui.button(icon="arrow_back", on_click=_go_back).props(
                 "flat dense round")
@@ -231,20 +262,39 @@ def _render_header(state: EditorState):
             ui.badge(f"spec {spec.get('spec_version', '1.5.2')}").props(
                 "color=grey outline")
 
-        with ui.row().classes("gap-2"):
-            ui.button("Compile", icon="build",
-                      on_click=lambda: _do_compile(state)).props("color=primary")
-            ui.button("Save Draft", icon="save",
-                      on_click=lambda: _do_save(state)).props("color=positive")
-            ui.button("Revert", icon="undo",
-                      on_click=lambda: _do_revert(state)).props("color=warning outline")
+        if state.locked:
+            with ui.row().classes("gap-2"):
+                ui.button("Compile", icon="build").props("color=primary disable")
+                ui.button("Save Draft", icon="save").props("color=positive disable")
+                ui.button("Revert", icon="undo").props("color=warning outline disable")
+        else:
+            with ui.row().classes("gap-2"):
+                ui.button("Compile", icon="build",
+                          on_click=lambda: _do_compile(state)).props("color=primary")
+                ui.button("Save Draft", icon="save",
+                          on_click=lambda: _do_save(state)).props("color=positive")
+                ui.button("Revert", icon="undo",
+                          on_click=lambda: _do_revert(state)).props("color=warning outline")
+
+    # Lock banner
+    if state.locked:
+        with ui.card().classes("w-full p-3 mb-2 accent-purple"):
+            with ui.row().classes("items-center gap-4"):
+                ui.icon("lock", color="purple").classes("text-xl")
+                ui.label("This strategy is locked (promoted beyond triage). Duplicate to create an editable variant.").classes(
+                    "text-purple-400")
+                ui.button("Duplicate as Variant", icon="content_copy",
+                          on_click=lambda: _duplicate_and_open(state)).props("outline dense")
 
     # Description
     desc_input = ui.input(
         value=spec.get("description", ""),
         label="Description",
     ).classes("w-full mb-2")
-    desc_input.on("change", lambda e: _update_field(state, "description", e.args))
+    if state.locked:
+        desc_input.props("readonly")
+    else:
+        desc_input.on("change", lambda e: _update_field(state, "description", e.args))
 
     # Archetype tags
     CANONICAL_ARCHETYPES = [
@@ -257,12 +307,22 @@ def _render_header(state: EditorState):
         for tag in CANONICAL_ARCHETYPES:
             active = tag in spec.get("archetype_tags", [])
             chip = ui.chip(tag, selectable=True, selected=active).props("dense")
-            chip.on("update:selected", lambda e, t=tag: _toggle_archetype(state, t, e.args))
+            if not state.locked:
+                chip.on("update:selected", lambda e, t=tag: _toggle_archetype(state, t, e.args))
+
+
+def _duplicate_and_open(state: EditorState):
+    """Duplicate a locked strategy and navigate to the new variant."""
+    from ui.services.composition_store import duplicate_composition
+    new_id = duplicate_composition(state.composition_id)
+    ui.notify("Created unlocked variant", type="positive")
+    ui.navigate.to(f"/editor/{new_id}")
 
 
 def _update_field(state: EditorState, field: str, value):
     state.working_spec[field] = value
-    state.mark_changed()
+    cosmetic = field in ("display_name", "description")
+    state.mark_changed(affects_compilation=not cosmetic)
 
 
 def _toggle_archetype(state: EditorState, tag: str, selected: bool):
@@ -315,6 +375,7 @@ def _do_compile(state: EditorState):
     try:
         result = state.compile()
         hash_val = result["strategy_config_hash"]
+        save_last_compilation(state.composition_id, result)
         ui.notify(f"Compiled: {hash_val[:24]}...", type="positive")
         # Re-render the compiler panel to show triage section
         if hasattr(state, "_compiler_container"):
@@ -333,6 +394,7 @@ def _do_save(state: EditorState):
     if state.last_compilation:
         hash_val = state.last_compilation["strategy_config_hash"]
         update_compiled_hash(state.composition_id, hash_val)
+        save_last_compilation(state.composition_id, state.last_compilation)
         try:
             save_artifacts(state.last_compilation)
         except Exception as e:
@@ -355,9 +417,10 @@ def _render_indicators_tab(state: EditorState, on_change):
     instances = spec.setdefault("indicator_instances", [])
 
     with ui.column().classes("w-full"):
-        ui.button("Add Indicator", icon="add",
-                  on_click=lambda: _add_indicator(state, on_change)).props(
-            "color=primary")
+        if not state.locked:
+            ui.button("Add Indicator", icon="add",
+                      on_click=lambda: _add_indicator(state, on_change)).props(
+                "color=primary")
 
         if not instances:
             ui.label("No indicators configured.").classes("text-gray-400 py-4")
@@ -395,13 +458,20 @@ def _render_indicators_tab(state: EditorState, on_change):
             "w-full").props("flat bordered dense")
 
         # Delete action slot
-        table.add_slot("body-cell-actions", """
-            <q-td :props="props">
-                <q-btn flat dense round icon="delete" color="negative"
-                       @click="$parent.$emit('delete', props.row.idx)" />
-            </q-td>
-        """)
-        table.on("delete", lambda e: _delete_indicator(state, e.args, on_change))
+        if state.locked:
+            table.add_slot("body-cell-actions", """
+                <q-td :props="props">
+                    <q-icon name="lock" color="grey" size="sm" />
+                </q-td>
+            """)
+        else:
+            table.add_slot("body-cell-actions", """
+                <q-td :props="props">
+                    <q-btn flat dense round icon="delete" color="negative"
+                           @click="$parent.$emit('delete', props.row.idx)" />
+                </q-td>
+            """)
+            table.on("delete", lambda e: _delete_indicator(state, e.args, on_change))
 
 
 async def _add_indicator(state: EditorState, on_change):
@@ -537,7 +607,12 @@ def _render_entry_rules_tab(state: EditorState, on_change):
             long_tab = ui.tab("LONG")
             short_tab = ui.tab("SHORT")
 
-        with ui.tab_panels(sub_tabs, value=long_tab).classes("w-full"):
+        sub_tab_map = {"LONG": long_tab, "SHORT": short_tab}
+        initial_sub = sub_tab_map.get(state.active_entry_direction, long_tab)
+        sub_tabs.on("update:model-value",
+                    lambda e: setattr(state, 'active_entry_direction', e.args))
+
+        with ui.tab_panels(sub_tabs, value=initial_sub).classes("w-full"):
             with ui.tab_panel(long_tab):
                 _render_entry_direction(state, "LONG", on_change)
             with ui.tab_panel(short_tab):
@@ -551,16 +626,17 @@ def _render_entry_direction(state: EditorState, direction: str, on_change):
                  if r.get("direction") == direction]
 
     with ui.column().classes("w-full"):
-        ui.button(f"Add {direction} Entry Rule", icon="add",
-                  on_click=lambda: _add_entry_rule(state, direction, on_change)).props(
-            "color=primary dense")
+        if not state.locked:
+            ui.button(f"Add {direction} Entry Rule", icon="add",
+                      on_click=lambda: _add_entry_rule(state, direction, on_change)).props(
+                "color=primary dense")
 
         if not dir_rules:
             ui.label(f"No {direction} entry rules.").classes("text-gray-400 py-2")
             return
 
         for idx, rule in dir_rules:
-            with ui.card().classes("w-full mb-2 p-3"):
+            with ui.card().classes(f"w-full mb-2 p-3 direction-{direction.lower()}"):
                 with ui.row().classes("w-full items-center justify-between"):
                     name_input = ui.input(
                         value=rule.get("label", ""),
@@ -594,7 +670,7 @@ def _render_entry_direction(state: EditorState, direction: str, on_change):
                 groups = rule.setdefault("condition_groups", [])
                 if groups:
                     for gi, grp in enumerate(groups):
-                        with ui.card().classes("w-full ml-4 p-2 mt-1"):
+                        with ui.card().classes("w-full ml-4 p-2 mt-1 accent-blue"):
                             with ui.row().classes("w-full items-center justify-between"):
                                 grp_name = ui.input(
                                     value=grp.get("label", f"Group {gi+1}"),

@@ -16,7 +16,7 @@ from ui.services.composition_store import (
     archive_composition,
     load_index,
 )
-from ui.services.promotion_reader import derive_lifecycle_state, derive_binding_state
+from ui.services.promotion_reader import derive_lifecycle_state, derive_binding_state, get_best_triage_tier
 from ui.pages.composition_editor import _editor_states
 
 LIFECYCLE_ORDER = {
@@ -63,6 +63,11 @@ def _build_row(entry: Dict[str, Any]) -> Dict[str, Any]:
         ds_label = "dataset" if dataset_count == 1 else "datasets"
         lifecycle_display = f"{lifecycle} ({dataset_count} {ds_label})"
 
+    # Get best triage tier (S/A/B or None)
+    triage_tier = get_best_triage_tier(entry.get("latest_compiled_hash"))
+
+    locked = lifecycle in ("SHADOW_VALIDATED", "LIVE_APPROVED")
+
     return {
         "composition_id": cid,
         "display_name": entry.get("display_name", "Untitled"),
@@ -71,6 +76,8 @@ def _build_row(entry: Dict[str, Any]) -> Dict[str, Any]:
         "lifecycle_state": lifecycle,
         "lifecycle_display": lifecycle_display,
         "lifecycle_warning": warning,
+        "triage_tier": triage_tier or "",
+        "locked": locked,
         "hash": (entry.get("latest_compiled_hash") or "\u2014")[:20],
         "updated_at": entry.get("updated_at", ""),
     }
@@ -146,6 +153,7 @@ def strategy_list_page():
                     {"name": "archetype_tags", "label": "Archetype", "field": "archetype_tags", "align": "left"},
                     {"name": "user_tags", "label": "Tags", "field": "user_tags", "align": "left"},
                     {"name": "lifecycle_state", "label": "Lifecycle", "field": "lifecycle_state", "align": "center"},
+                    {"name": "triage_tier", "label": "Tier", "field": "triage_tier", "align": "center"},
                     {"name": "hash", "label": "Hash", "field": "hash", "align": "left"},
                     {"name": "updated_at", "label": "Updated", "field": "updated_at", "align": "left"},
                     {"name": "actions", "label": "", "field": "actions", "align": "center"},
@@ -157,9 +165,35 @@ def strategy_list_page():
                     row_key="composition_id",
                 ).classes("w-full").props("flat bordered dense")
 
+                # Archetype tags as chips
+                table.add_slot("body-cell-archetype_tags", """
+                    <q-td :props="props">
+                        <q-chip v-for="tag in (props.row.archetype_tags || '').split(', ').filter(t => t)"
+                                :key="tag" :label="tag" dense size="sm" color="dark" text-color="white"
+                                class="q-mr-xs" style="font-size: 10px;" />
+                    </q-td>
+                """)
+
+                # User tags as chips
+                table.add_slot("body-cell-user_tags", """
+                    <q-td :props="props">
+                        <q-chip v-for="tag in (props.row.user_tags || '').split(', ').filter(t => t)"
+                                :key="tag" :label="tag" dense size="sm" outline
+                                class="q-mr-xs" style="font-size: 10px;" />
+                    </q-td>
+                """)
+
+                # Hash as monospace
+                table.add_slot("body-cell-hash", """
+                    <q-td :props="props">
+                        <span class="monospace" style="font-size: 11px;">{{ props.row.hash }}</span>
+                    </q-td>
+                """)
+
                 # Add slot for lifecycle badge
                 table.add_slot("body-cell-lifecycle_state", """
                     <q-td :props="props">
+                        <q-icon v-if="props.row.locked" name="lock" color="purple" size="xs" class="q-mr-xs" />
                         <q-badge :color="props.row.lifecycle_state === 'CORRUPTED' ? 'negative' :
                                          props.row.lifecycle_state === 'DRAFT' ? 'grey' :
                                          props.row.lifecycle_state === 'COMPILED' ? 'blue' :
@@ -173,9 +207,33 @@ def strategy_list_page():
                     </q-td>
                 """)
 
+                # Tier badge (S/A/B letter grade) with gradient styling
+                table.add_slot("body-cell-triage_tier", """
+                    <q-td :props="props">
+                        <q-badge v-if="props.row.triage_tier"
+                                 :color="props.row.triage_tier === 'S' ? 'purple' :
+                                         props.row.triage_tier === 'A' ? 'green' :
+                                         props.row.triage_tier === 'B' ? 'blue' : 'grey'"
+                                 :label="props.row.triage_tier"
+                                 :class="props.row.triage_tier === 'S' ? 'tier-badge-s' :
+                                         props.row.triage_tier === 'A' ? 'tier-badge-a' :
+                                         props.row.triage_tier === 'B' ? 'tier-badge-b' : ''" />
+                    </q-td>
+                """)
+
                 # Actions column
                 table.add_slot("body-cell-actions", """
                     <q-td :props="props">
+                        <q-btn v-if="props.row.lifecycle_state === 'TRIAGE_PASSED'"
+                               flat dense round icon="trending_up" size="sm" color="purple"
+                               @click.stop="$parent.$emit('promote_shadow', props.row.composition_id)">
+                            <q-tooltip>Promote to Shadow</q-tooltip>
+                        </q-btn>
+                        <q-btn v-if="props.row.lifecycle_state === 'SHADOW_VALIDATED'"
+                               flat dense round icon="rocket_launch" size="sm" color="positive"
+                               @click.stop="$parent.$emit('promote_live', props.row.composition_id)">
+                            <q-tooltip>Promote to Live</q-tooltip>
+                        </q-btn>
                         <q-btn flat dense round icon="content_copy" size="sm"
                                @click.stop="$parent.$emit('duplicate', props.row.composition_id)" />
                         <q-btn flat dense round icon="archive" size="sm" color="grey"
@@ -188,6 +246,8 @@ def strategy_list_page():
                 table.on("duplicate", lambda e: _do_duplicate(e.args, refresh_table))
                 table.on("archive", lambda e: _do_archive(e.args, rows, refresh_table))
                 table.on("delete", lambda e: _do_delete(e.args, rows, refresh_table))
+                table.on("promote_shadow", lambda e: _do_promote(e.args, rows, "SHADOW_VALIDATED", refresh_table))
+                table.on("promote_live", lambda e: _do_promote(e.args, rows, "LIVE_APPROVED", refresh_table))
 
                 # Row click → editor
                 table.on("row-click", lambda e: ui.navigate.to(
@@ -287,6 +347,74 @@ async def _do_delete(cid, rows, refresh_table):
     delete_composition(cid)
     ui.notify(f"Deleted: {display_name}", type="positive")
     refresh_table()
+
+
+async def _do_promote(cid, rows, lifecycle_tier, refresh_table):
+    """Promote a strategy to the next lifecycle stage."""
+    display_name = "composition"
+    for r in rows:
+        if r["composition_id"] == cid:
+            display_name = r["display_name"]
+            break
+
+    index = load_index()
+    entry = index.get("compositions", {}).get(cid, {})
+    compiled_hash = entry.get("latest_compiled_hash")
+    if not compiled_hash:
+        ui.notify("No compiled hash found — compile first", type="warning")
+        return
+
+    tier_labels = {
+        "SHADOW_VALIDATED": ("Promote to Shadow", "shadow trading validation"),
+        "LIVE_APPROVED": ("Promote to Live", "live trading with real capital"),
+    }
+    label, desc = tier_labels.get(lifecycle_tier, ("Promote", "next stage"))
+
+    if lifecycle_tier == "LIVE_APPROVED":
+        # Strong confirmation for live
+        with ui.dialog() as dialog, ui.card().classes("w-[500px]"):
+            ui.label(f"PROMOTE '{display_name}' TO LIVE?").classes("text-lg font-bold text-red-400")
+            ui.label(f"This approves the strategy for {desc}.").classes("text-sm mt-2")
+            ui.label("Type LIVE to confirm:").classes("text-sm text-gray-400 mt-2")
+            confirm_input = ui.input(label="Type LIVE").classes("w-full")
+            with ui.row().classes("w-full justify-end gap-2 mt-4"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+                go_btn = ui.button("Go Live", on_click=lambda: dialog.submit(True)).props(
+                    "color=positive disable")
+                confirm_input.on("update:model-value",
+                    lambda e: go_btn.props(remove="disable") if e.args == "LIVE"
+                    else go_btn.props("disable"))
+        dialog.open()
+        confirmed = await dialog
+        if not confirmed:
+            return
+    else:
+        with ui.dialog() as dialog, ui.card().classes("w-[500px]"):
+            ui.label(f"{label}: '{display_name}'?").classes("text-lg font-bold")
+            ui.label(f"This marks the strategy for {desc}.").classes("text-sm mt-2 text-gray-400")
+            with ui.row().classes("w-full justify-end gap-2 mt-4"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+                ui.button("Promote", on_click=lambda: dialog.submit(True)).props("color=purple")
+        dialog.open()
+        confirmed = await dialog
+        if not confirmed:
+            return
+
+    try:
+        from ui.services.research_services import write_lifecycle_promotion
+        from strategy_framework_v1_8_0 import compute_config_hash
+        spec = load_composition(cid)
+        spec_hash = compute_config_hash(spec) if spec else ""
+        write_lifecycle_promotion(
+            strategy_config_hash=compiled_hash,
+            composition_spec_hash=spec_hash,
+            dataset_prefix="manual",
+            lifecycle_tier=lifecycle_tier,
+        )
+        ui.notify(f"Promoted to {lifecycle_tier}", type="positive")
+        refresh_table()
+    except Exception as e:
+        ui.notify(f"Promotion error: {e}", type="negative")
 
 
 async def _new_composition():

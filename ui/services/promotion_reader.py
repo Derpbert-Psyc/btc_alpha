@@ -20,6 +20,13 @@ LIFECYCLE_TIERS = [
     "LIVE_APPROVED",
 ]
 
+# Map triage letter-grade tiers to lifecycle states
+TRIAGE_TIER_TO_LIFECYCLE = {
+    "S": "TRIAGE_PASSED",
+    "A": "TRIAGE_PASSED",
+    "B": "TRIAGE_PASSED",
+}
+
 PROMOTION_REQUIRED_FIELDS = {
     "strategy_config_hash", "composition_spec_hash", "dataset_prefix",
     "runner_economics", "triage_result_summary", "timestamp", "tier",
@@ -70,7 +77,9 @@ def derive_lifecycle_state(
                 continue
 
             # Read tier from JSON content, not filename
-            tier = artifact.get("tier", "")
+            raw_tier = artifact.get("tier", "")
+            # Map triage letter-grades (S/A/B) to lifecycle state
+            tier = TRIAGE_TIER_TO_LIFECYCLE.get(raw_tier, raw_tier)
             if tier not in LIFECYCLE_TIERS:
                 continue
 
@@ -87,6 +96,42 @@ def derive_lifecycle_state(
             continue
 
     return LIFECYCLE_TIERS[highest_tier_idx], len(dataset_prefixes), None
+
+
+def get_best_triage_tier(latest_compiled_hash: Optional[str]) -> Optional[str]:
+    """Get the best triage letter-grade tier (S/A/B) from promotion artifacts.
+
+    Returns the tier letter or None if no triage has been run.
+    """
+    if not latest_compiled_hash:
+        return None
+
+    hash_val = latest_compiled_hash
+    if hash_val.startswith("sha256:"):
+        hash_val = hash_val[7:]
+
+    promotions_dir = os.path.join(RESEARCH_DIR, "promotions", hash_val)
+    if not os.path.isdir(promotions_dir):
+        return None
+
+    tier_rank = {"S": 0, "A": 1, "B": 2}
+    best_tier = None
+
+    for filename in os.listdir(promotions_dir):
+        if not filename.endswith(".json"):
+            continue
+        try:
+            filepath = os.path.join(promotions_dir, filename)
+            with open(filepath) as f:
+                artifact = json.load(f)
+            raw_tier = artifact.get("tier", "")
+            if raw_tier in tier_rank:
+                if best_tier is None or tier_rank[raw_tier] < tier_rank[best_tier]:
+                    best_tier = raw_tier
+        except (json.JSONDecodeError, IOError):
+            continue
+
+    return best_tier
 
 
 def get_promotion_details(

@@ -12,6 +12,7 @@ from ui.services.research_services import (
     list_datasets,
     run_triage_for_composition,
     write_promotion_for_composition,
+    load_latest_triage_result,
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_BPS,
     DEFAULT_STARTING_CAPITAL,
@@ -121,6 +122,13 @@ def _render_triage_section(state, compilation_result):
         ).classes("w-96")
 
         results_container = ui.column().classes("w-full mt-2")
+
+        # Show latest saved triage result if available
+        latest_triage = load_latest_triage_result(hash_val)
+        if latest_triage:
+            with results_container:
+                _display_saved_triage_result(latest_triage, state, hash_val)
+
         progress_label = ui.label("").classes("text-sm text-gray-400")
         progress_spinner = ui.spinner(size="sm").classes("hidden")
         triage_running = {"active": False}
@@ -197,6 +205,53 @@ TIER_COLORS = {"S": "purple", "A": "green", "B": "blue", "C": "amber", "F": "red
 STATUS_COLORS = {"PASS": "green", "WARN": "amber", "FAIL": "red", "INSUFFICIENT DATA": "grey"}
 
 
+def _display_saved_triage_result(saved_data: dict, state, strategy_hash: str):
+    """Display a previously saved triage result from disk JSON."""
+    tv2_dict = saved_data.get("triage_v2", {})
+    if not tv2_dict:
+        return
+
+    tier = tv2_dict.get("tier", "F")
+    tier_color = TIER_COLORS.get(tier, "grey")
+
+    with ui.card().classes("w-full p-4"):
+        with ui.row().classes("items-center gap-4"):
+            _tier_css = {"S": "tier-badge-s", "A": "tier-badge-a", "B": "tier-badge-b"}.get(tier, "")
+            ui.badge(f"TIER {tier}", color=tier_color).classes(f"text-xl px-3 py-1 {_tier_css}")
+            ui.label(tv2_dict.get("tier_action", "")).classes("text-lg font-bold")
+            ui.badge("saved result", color="grey").classes("text-xs")
+
+        m = tv2_dict.get("metrics", {})
+        with ui.row().classes("gap-6 mt-3 flex-wrap text-sm"):
+            wr = m.get("win_rate", 0)
+            ui.label(f"Win Rate: {wr:.1f}%").classes("font-bold")
+            ui.label(f"Expectancy: {m.get('expectancy_bps', 0):+.1f} bps/trade")
+            ui.label(f"PF: {m.get('profit_factor', '?')}")
+            be = m.get("breakeven_cost_bps")
+            if be is not None:
+                ui.label(f"Breakeven: {be:.0f} bps")
+            ui.label(f"Wilson LB: {m.get('wilson_lb', 0):.1f}%")
+            ui.label(f"Max DD: {m.get('max_drawdown_pct', 0):.1f}%")
+
+        # Test results summary
+        test_results = tv2_dict.get("test_results", [])
+        if test_results:
+            with ui.row().classes("gap-2 mt-2 flex-wrap"):
+                for tr in test_results:
+                    status = tr.get("status", "?")
+                    color = STATUS_COLORS.get(status, "grey")
+                    ui.badge(f"{tr.get('name', '?')}: {status}", color=color).classes("text-xs")
+
+        with ui.row().classes("gap-8 mt-2 flex-wrap text-sm text-gray-400"):
+            ui.label(f"Dataset: {saved_data.get('dataset_filename', saved_data.get('dataset_prefix', ''))}")
+            ui.label(f"Trades: {saved_data.get('trade_count', 0)}")
+            ui.label(f"Bars: {saved_data.get('bar_count', 0):,}")
+            ui.label(f"Saved: {saved_data.get('timestamp', '')}")
+
+    # Lifecycle promotion buttons (Shadow / Live)
+    _render_lifecycle_promotion_buttons(state, strategy_hash)
+
+
 def _display_triage_v2_results(state, triage_run: TriageRunResult, strategy_hash: str):
     """Display triage v2 results inline."""
     if triage_run.zero_trades:
@@ -216,7 +271,8 @@ def _display_triage_v2_results(state, triage_run: TriageRunResult, strategy_hash
     # Tier banner
     with ui.card().classes("w-full p-4"):
         with ui.row().classes("items-center gap-4"):
-            ui.badge(f"TIER {tier}", color=tier_color).classes("text-2xl px-4 py-2")
+            _tier_css = {"S": "tier-badge-s", "A": "tier-badge-a", "B": "tier-badge-b"}.get(tier, "")
+            ui.badge(f"TIER {tier}", color=tier_color).classes(f"text-2xl px-4 py-2 {_tier_css}")
             ui.label(tv2.tier_action).classes("text-lg font-bold")
 
         # Key metrics row
@@ -269,6 +325,9 @@ def _display_triage_v2_results(state, triage_run: TriageRunResult, strategy_hash
     # Promotion button (S, A, B tiers)
     if tier in ("S", "A", "B"):
         _render_promotion_button(state, triage_run, strategy_hash)
+
+    # Lifecycle promotion buttons (Shadow / Live)
+    _render_lifecycle_promotion_buttons(state, strategy_hash)
 
 
 def _render_test_results_table(tv2):
@@ -395,6 +454,96 @@ def _render_promotion_button(state, triage_run: TriageRunResult, strategy_hash: 
         ui.button("Write Promotion Artifact", icon="verified",
                   on_click=do_write_promotion).props("color=positive")
         ui.label(f"Tier {tv2.tier}: {tv2.tier_action}").classes("text-xs text-gray-400")
+
+
+def _render_lifecycle_promotion_buttons(state, strategy_hash: str):
+    """Render promote-to-Shadow and promote-to-Live buttons based on lifecycle state."""
+    from ui.services.promotion_reader import derive_lifecycle_state
+    from ui.services.composition_store import load_index
+
+    index = load_index()
+    entry = index.get("compositions", {}).get(state.composition_id, {})
+    compiled_hash = entry.get("latest_compiled_hash") or strategy_hash
+    if not compiled_hash:
+        return
+
+    lifecycle, _, _ = derive_lifecycle_state(state.composition_id, compiled_hash)
+
+    if lifecycle == "TRIAGE_PASSED":
+        with ui.row().classes("gap-4 items-center mt-3"):
+            async def promote_to_shadow():
+                with ui.dialog() as dlg, ui.card().classes("w-[500px]"):
+                    ui.label("Promote to Shadow?").classes("text-lg font-bold")
+                    ui.label(
+                        "This marks the strategy for shadow trading validation. "
+                        "The VPS operations console will pick it up from the artifact store."
+                    ).classes("text-sm mt-2 text-gray-400")
+                    notes_input = ui.input(label="Notes (optional)").classes("w-full")
+                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
+                        ui.button("Cancel", on_click=dlg.close).props("flat")
+                        ui.button("Promote", on_click=lambda: dlg.submit(True)).props(
+                            "color=purple")
+                dlg.open()
+                confirmed = await dlg
+                if not confirmed:
+                    return
+                try:
+                    from ui.services.research_services import write_lifecycle_promotion
+                    spec_hash = compute_config_hash(state.working_spec)
+                    filepath = write_lifecycle_promotion(
+                        strategy_config_hash=compiled_hash,
+                        composition_spec_hash=spec_hash,
+                        dataset_prefix="manual",
+                        lifecycle_tier="SHADOW_VALIDATED",
+                        notes=notes_input.value.strip(),
+                    )
+                    ui.notify(f"Promoted to SHADOW_VALIDATED", type="positive")
+                except Exception as e:
+                    ui.notify(f"Promotion error: {e}", type="negative")
+
+            ui.button("Promote to Shadow", icon="visibility",
+                      on_click=promote_to_shadow).props("color=purple outline")
+            ui.label("Next step: shadow trading validation").classes("text-xs text-gray-400")
+
+    elif lifecycle == "SHADOW_VALIDATED":
+        with ui.row().classes("gap-4 items-center mt-3"):
+            async def promote_to_live():
+                with ui.dialog() as dlg, ui.card().classes("w-[500px]"):
+                    ui.label("PROMOTE TO LIVE?").classes("text-lg font-bold text-red-400")
+                    ui.label(
+                        "This approves the strategy for live trading with real capital."
+                    ).classes("text-sm mt-2")
+                    ui.label("Type LIVE to confirm:").classes("text-sm text-gray-400 mt-2")
+                    confirm_input = ui.input(label="Type LIVE").classes("w-full")
+                    notes_input = ui.input(label="Notes (optional)").classes("w-full mt-2")
+                    with ui.row().classes("w-full justify-end gap-2 mt-4"):
+                        ui.button("Cancel", on_click=dlg.close).props("flat")
+                        go_btn = ui.button("Go Live", on_click=lambda: dlg.submit(True)).props(
+                            "color=positive disable")
+                        confirm_input.on("update:model-value",
+                            lambda e: go_btn.props(remove="disable") if e.args == "LIVE"
+                            else go_btn.props("disable"))
+                dlg.open()
+                confirmed = await dlg
+                if not confirmed:
+                    return
+                try:
+                    from ui.services.research_services import write_lifecycle_promotion
+                    spec_hash = compute_config_hash(state.working_spec)
+                    filepath = write_lifecycle_promotion(
+                        strategy_config_hash=compiled_hash,
+                        composition_spec_hash=spec_hash,
+                        dataset_prefix="manual",
+                        lifecycle_tier="LIVE_APPROVED",
+                        notes=notes_input.value.strip(),
+                    )
+                    ui.notify(f"Promoted to LIVE_APPROVED", type="positive")
+                except Exception as e:
+                    ui.notify(f"Promotion error: {e}", type="negative")
+
+            ui.button("Promote to Live", icon="rocket_launch",
+                      on_click=promote_to_live).props("color=positive")
+            ui.label("Requires typed confirmation").classes("text-xs text-gray-400")
 
 
 async def _show_report(report):

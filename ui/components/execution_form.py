@@ -8,8 +8,9 @@ def render_execution_form(state, on_change: Callable):
     """Render execution parameters tab."""
     spec = state.working_spec
     ep = spec.setdefault("execution_params", {})
+    locked = state.locked
 
-    with ui.column().classes("w-full"):
+    with ui.column().classes("w-full accent-cyan"):
         with ui.row().classes("gap-4 flex-wrap"):
             _dir_options = ["BOTH", "LONG", "SHORT"]
             _dir_val = ep.get("direction", "BOTH")
@@ -93,12 +94,16 @@ def render_execution_form(state, on_change: Callable):
 
 
 def _update(state, ep, field, value, on_change):
+    if state.locked:
+        return
     ep[field] = value
     state.mark_changed()
     on_change()
 
 
 def _update_fm(state, ep, field, value, on_change):
+    if state.locked:
+        return
     fm = ep.setdefault("funding_model", {})
     fm[field] = value
     state.mark_changed()

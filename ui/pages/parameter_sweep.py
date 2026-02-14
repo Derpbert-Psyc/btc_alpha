@@ -1,6 +1,7 @@
 """Parameter Sweep — vary one param, recompile + run, show results table."""
 
 import asyncio
+import math
 import traceback
 from typing import Any, Dict, List, Optional
 
@@ -12,6 +13,41 @@ from ui.services.research_services import (
     run_sweep_for_composition,
     SweepResult,
 )
+
+
+def _extract_sweepable_params(spec: dict) -> List[dict]:
+    """Auto-extract sweepable parameters from indicator_instances.
+
+    Returns list of {param, default, min, max} dicts with dot-path param names
+    (label.param_name) compatible with _apply_param_override.
+    """
+    params = []
+    for inst in spec.get("indicator_instances", []):
+        label = inst.get("label", "")
+        if not label:
+            continue
+        for pname, pval in inst.get("parameters", {}).items():
+            if not isinstance(pval, (int, float)):
+                continue
+            # Heuristic bounds: period-like params stay >= 2, others >= 0
+            is_period = "period" in pname.lower()
+            default = pval
+            if is_period:
+                lo = max(2, int(default * 0.5))
+                hi = int(math.ceil(default * 2.5))
+            elif default > 0:
+                lo = round(default * 0.5, 4)
+                hi = round(default * 2.0, 4)
+            else:
+                lo = 0
+                hi = max(1, abs(default) * 2)
+            params.append({
+                "param": f"{label}.{pname}",
+                "default": default,
+                "min": lo,
+                "max": hi,
+            })
+    return params
 
 
 def parameter_sweep_page(composition_id: str):
@@ -32,12 +68,26 @@ def parameter_sweep_page(composition_id: str):
         ui.label(f"Composition: {spec.get('display_name', composition_id[:16])}").classes(
             "text-sm text-gray-400")
 
-        # Get triage-sensitive params
-        tsp = spec.get("metadata", {}).get("triage_sensitive_params", [])
-        if not tsp:
-            ui.label("No triage-sensitive parameters defined. Add them in the Metadata tab.").classes(
+        # Merge manual triage_sensitive_params with auto-extracted indicator params
+        manual_tsp = spec.get("metadata", {}).get("triage_sensitive_params", [])
+        auto_tsp = _extract_sweepable_params(spec)
+
+        # Manual params take priority — collect their param names for dedup
+        manual_names = {p.get("param", "") for p in manual_tsp}
+        merged = list(manual_tsp)
+        for ap in auto_tsp:
+            if ap["param"] not in manual_names:
+                merged.append(ap)
+
+        if not merged:
+            ui.label("No sweepable parameters. Add indicator instances first.").classes(
                 "text-amber-400 py-4")
             return
+
+        if auto_tsp and not manual_tsp:
+            ui.label("Parameters auto-extracted from indicator instances. "
+                     "Define triage_sensitive_params in Metadata for custom ranges.").classes(
+                "text-xs text-gray-500 mb-2")
 
         # Dataset selector
         datasets = list_datasets()
@@ -48,7 +98,7 @@ def parameter_sweep_page(composition_id: str):
         dataset_options = {d["label"]: d["path"] for d in datasets}
 
         # Parameter selector
-        param_options = {p.get("param", f"param_{i}"): p for i, p in enumerate(tsp)}
+        param_options = {p.get("param", f"param_{i}"): p for i, p in enumerate(merged)}
         param_select = ui.select(
             list(param_options.keys()),
             value=list(param_options.keys())[0] if param_options else "",

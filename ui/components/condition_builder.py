@@ -11,13 +11,13 @@ from ui.services.output_descriptions import get_output_description
 # Operator options (no is_present/is_absent — reserved for future)
 # ---------------------------------------------------------------------------
 OPERATOR_OPTIONS = {
-    ">": "> (above)",
-    "<": "< (below)",
-    ">=": ">= (at or above)",
-    "<=": "<= (at or below)",
-    "==": "== (equals)",
-    "crosses_above": "crosses_above \u2191 (was below, now above)",
-    "crosses_below": "crosses_below \u2193 (was above, now below)",
+    ">": "> (value currently above threshold)",
+    "<": "< (value currently below threshold)",
+    ">=": ">= (value currently at or above threshold)",
+    "<=": "<= (value currently at or below threshold)",
+    "==": "== (value equals threshold)",
+    "crosses_above": "crosses_above \u2191 (value was < threshold last bar, now \u2265 threshold)",
+    "crosses_below": "crosses_below \u2193 (value was > threshold last bar, now \u2264 threshold)",
 }
 
 
@@ -243,6 +243,16 @@ def render_condition_builder(
 ):
     """Render a condition builder for a list of conditions."""
     spec = state.working_spec
+
+    # Locked mode: read-only summaries
+    if state.locked:
+        with ui.column().classes("w-full"):
+            for cond in conditions:
+                summary = _build_condition_summary(cond, spec)
+                ui.label(summary).classes("text-sm text-gray-400 py-1")
+            if not conditions:
+                ui.label("No conditions.").classes("text-xs text-gray-500")
+        return
 
     with ui.column().classes("w-full"):
         for i, cond in enumerate(conditions):

@@ -46,8 +46,9 @@ def render_gate_editor(state, on_change: Callable):
                     "Most severe wins: FORCE_FLAT > HANDOFF > HOLD"
                 ).classes("text-sm text-amber-400")
 
-        ui.button("Add Gate", icon="add",
-                  on_click=lambda: _add_gate(state, on_change)).props("color=primary")
+        if not state.locked:
+            ui.button("Add Gate", icon="add",
+                      on_click=lambda: _add_gate(state, on_change)).props("color=primary")
 
         if not gates:
             ui.label("No gate rules — signals always active.").classes(
@@ -58,8 +59,8 @@ def render_gate_editor(state, on_change: Callable):
             policy = gate.get("exit_policy", "HOLD")
             color = POLICY_COLORS.get(policy, "grey")
 
-            with ui.card().classes(f"w-full mb-2 p-3 border-l-4").style(
-                f"border-left-color: {'#ef4444' if policy == 'FORCE_FLAT' else '#f59e0b' if policy == 'HANDOFF' else '#3b82f6'}"):
+            _gate_accent = {"FORCE_FLAT": "accent-red", "HANDOFF": "accent-amber", "HOLD": "accent-blue"}
+            with ui.card().classes(f"w-full mb-2 p-3 {_gate_accent.get(policy, 'accent-blue')}"):
 
                 with ui.row().classes("w-full items-center justify-between"):
                     with ui.row().classes("items-center gap-2"):

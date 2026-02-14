@@ -37,8 +37,9 @@ def render_exit_rules(state, on_change: Callable):
     available_types = _available_exit_types(target_ev)
 
     with ui.column().classes("w-full"):
-        ui.button("Add Exit Rule", icon="add",
-                  on_click=lambda: _add_exit_rule(state, on_change)).props("color=primary")
+        if not state.locked:
+            ui.button("Add Exit Rule", icon="add",
+                      on_click=lambda: _add_exit_rule(state, on_change)).props("color=primary")
 
         if not rules:
             ui.label("No exit rules.").classes("text-gray-400 py-4")
@@ -48,7 +49,7 @@ def render_exit_rules(state, on_change: Callable):
             et = rule.get("exit_type", "SIGNAL")
             badge = PRIORITY_BADGES[i] if i < len(PRIORITY_BADGES) else f"({i+1})"
 
-            with ui.card().classes("w-full mb-2 p-3"):
+            with ui.card().classes("w-full mb-2 p-3 accent-amber"):
                 with ui.row().classes("w-full items-center justify-between"):
                     with ui.row().classes("items-center gap-2"):
                         ui.label(badge).classes("text-lg")

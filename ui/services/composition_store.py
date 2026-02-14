@@ -182,6 +182,36 @@ def archive_composition(composition_id: str, reason: str) -> None:
     save_composition(composition_id, spec)
 
 
+def save_last_compilation(composition_id: str, compilation_result: dict) -> None:
+    """Save last compilation result to composition directory."""
+    dir_path = _composition_dir(composition_id)
+    os.makedirs(dir_path, exist_ok=True)
+    path = os.path.join(dir_path, "last_compilation.json")
+    _atomic_write_json(path, compilation_result)
+
+
+def load_last_compilation(composition_id: str) -> Optional[Dict[str, Any]]:
+    """Load last compilation result from disk. Returns None if not found."""
+    path = os.path.join(_composition_dir(composition_id), "last_compilation.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
+def delete_last_compilation(composition_id: str) -> None:
+    """Delete saved compilation result (used when spec changes invalidate it)."""
+    path = os.path.join(_composition_dir(composition_id), "last_compilation.json")
+    if os.path.exists(path):
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
 def _save_composition(composition_id: str, spec: Dict[str, Any]) -> None:
     """Write composition.json atomically."""
     path = _composition_path(composition_id)
