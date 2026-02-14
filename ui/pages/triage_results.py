@@ -111,13 +111,20 @@ def _render_result(data: dict, filename: str = ""):
 def _render_key_metrics(metrics: dict):
     """Render key metrics row."""
     metric_defs = [
-        ("win_rate", "Win Rate", lambda v: f"{v:.1%}" if isinstance(v, (int, float)) else str(v)),
-        ("expectancy_bps", "Expectancy", lambda v: f"{v:+.1f} bps"),
-        ("profit_factor", "PF", lambda v: f"{v:.2f}"),
-        ("breakeven_bps", "Breakeven", lambda v: f"{v:.0f} bps" if v else "N/A"),
-        ("wilson_lower_bound", "Wilson LB", lambda v: f"{v:.1%}" if isinstance(v, (int, float)) else str(v)),
-        ("max_drawdown_pct", "Max DD", lambda v: f"{v:.1f}%"),
-        ("max_consecutive_losses", "Max Consec Loss", lambda v: str(int(v))),
+        ("win_rate", "Win Rate",
+         lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else str(v)),
+        ("expectancy_bps", "Expectancy",
+         lambda v: f"{v:+.1f} bps"),
+        ("profit_factor", "PF",
+         lambda v: v if isinstance(v, str) else f"{v:.2f}"),
+        ("breakeven_cost_bps", "Breakeven",
+         lambda v: f"{v:.0f} bps" if v else "N/A"),
+        ("wilson_lb", "Wilson LB",
+         lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else str(v)),
+        ("max_drawdown_pct", "Max DD",
+         lambda v: f"{v:.1f}%"),
+        ("max_consecutive_losses", "Max Consec Loss",
+         lambda v: str(int(v))),
     ]
 
     with ui.row().classes("gap-6 mt-3 flex-wrap"):

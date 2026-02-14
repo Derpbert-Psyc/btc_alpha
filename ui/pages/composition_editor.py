@@ -411,6 +411,57 @@ def _do_revert(state: EditorState):
     ui.navigate.to(f"/editor/{state.composition_id}")
 
 
+def _get_indicator_target_tab(state, indicator_label: str, indicator_role: str) -> str:
+    """Determine which tab to navigate to when an indicator row is clicked."""
+    spec = state.working_spec
+
+    # Scan entry rules (top-level conditions AND condition_group conditions)
+    for rule in spec.get("entry_rules", []):
+        for cond in rule.get("conditions", []):
+            if cond.get("indicator") == indicator_label:
+                return "Entry Rules"
+        for grp in rule.get("condition_groups", []):
+            for cond in grp.get("conditions", []):
+                if cond.get("indicator") == indicator_label:
+                    return "Entry Rules"
+
+    # Scan exit rules (flat conditions only)
+    for rule in spec.get("exit_rules", []):
+        for cond in rule.get("conditions", []):
+            if cond.get("indicator") == indicator_label:
+                return "Exit Rules"
+
+    # Scan gate rules (flat conditions only)
+    for rule in spec.get("gate_rules", []):
+        for cond in rule.get("conditions", []):
+            if cond.get("indicator") == indicator_label:
+                return "Gates"
+
+    # No references found — fall back to role-based mapping
+    role_map = {
+        "entry_signal": "Entry Rules",
+        "filter": "Entry Rules",
+        "trigger": "Entry Rules",
+        "exit_signal": "Exit Rules",
+        "gate": "Gates",
+        "sizing": "Execution",
+        "diagnostic": "Indicators",
+        "price": "Indicators",
+    }
+    return role_map.get(indicator_role, "Indicators")
+
+
+def _on_indicator_row_click(state, event_args):
+    """Handle indicator table row click — switch to relevant tab."""
+    row = event_args[1]
+    label = row.get("label", "")
+    role = row.get("role", "")
+    target = _get_indicator_target_tab(state, label, role)
+    if target != state.active_tab:
+        state.active_tab = target
+        ui.navigate.to(f"/editor/{state.composition_id}")
+
+
 def _render_indicators_tab(state: EditorState, on_change):
     """Render the indicator instances tab."""
     spec = state.working_spec
@@ -456,6 +507,7 @@ def _render_indicators_tab(state: EditorState, on_change):
 
         table = ui.table(columns=columns, rows=rows, row_key="idx").classes(
             "w-full").props("flat bordered dense")
+        table.on("row-click", lambda e: _on_indicator_row_click(state, e.args))
 
         # Delete action slot
         if state.locked:
@@ -468,7 +520,7 @@ def _render_indicators_tab(state: EditorState, on_change):
             table.add_slot("body-cell-actions", """
                 <q-td :props="props">
                     <q-btn flat dense round icon="delete" color="negative"
-                           @click="$parent.$emit('delete', props.row.idx)" />
+                           @click.stop="$parent.$emit('delete', props.row.idx)" />
                 </q-td>
             """)
             table.on("delete", lambda e: _delete_indicator(state, e.args, on_change))
