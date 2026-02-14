@@ -144,6 +144,8 @@ INDICATOR_NAME_TO_ID: Dict[str, int] = {
     "correlation": 20, "beta": 21, "dd_price": 22,
     "dd_per_trade": 23, "dd_metrics": 24,
     "lmagr": 25,
+    "dc_position": 30,
+    "vol_regime": 31,
 }
 
 # Reverse mapping
@@ -191,6 +193,10 @@ DIAGNOSTIC_OUTPUTS: Dict[int, Dict[str, str]] = {
     27: {"oi_change": "RATE"},
     28: {"volume_profile": "RATE"},
     29: {"liquidation_intensity": "RATE"},
+    30: {"percent_b": "RATE", "bars_since_upper": "RATE", "bars_since_lower": "RATE",
+         "retrace_from_lower": "RATE", "retrace_from_upper": "RATE",
+         "new_upper": "RATE", "new_lower": "RATE"},
+    31: {"vol_ratio": "RATE"},
 }
 
 
@@ -298,7 +304,7 @@ def _generic_warmup(indicator_id: int, params: dict) -> int:
         return 1
     elif indicator_id == 24:  # DD Metrics
         return 1
-    elif 25 <= indicator_id <= 29:  # Diagnostic probes
+    elif 25 <= indicator_id <= 31:  # Diagnostic probes
         return params.get("length", params.get("period", 1))
     else:
         raise ValueError(f"Unknown indicator_id: {indicator_id}")
@@ -431,6 +437,7 @@ _EXECUTION_PARAMS_FIELDS = {
     "trade_rate_limit", "slippage_budget", "warmup_restart_policy",
     "mtm_drawdown_exit",
     "strict_entry_paths", "strict_exit_paths",
+    "post_exit_cooldown_bars",
 }
 
 _TOP_LEVEL_FIELDS = {

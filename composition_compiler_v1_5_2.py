@@ -881,6 +881,10 @@ def _lower_exit_rule(rule: dict, exit_type: str,
         if "value_short_bps" in rule:
             params["percent_short"] = str(
                 Decimal(str(rule["value_short_bps"])) / 10000)
+        if "atr_multiple" in rule:
+            params["atr_multiple"] = rule["atr_multiple"]
+        if "atr_indicator_label" in rule:
+            params["atr_indicator_label"] = rule["atr_indicator_label"]
         fw["parameters"] = params
 
     elif exit_type == "MTM_DRAWDOWN_EXIT":
@@ -971,6 +975,7 @@ AUTHORING_ONLY_EXIT = {
     "mode", "exchange_side", "value_long_bps", "value_short_bps",
     "drawdown_bps_long", "drawdown_bps_short", "time_limit_bars",
     "time_limit_reference_cadence",
+    "atr_multiple", "atr_indicator_label",
 }
 
 AUTHORING_ONLY_GATE = {

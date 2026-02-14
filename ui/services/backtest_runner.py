@@ -470,12 +470,132 @@ def compute_linreg_slope(closes: List[float], period: int = 14) -> List[Optional
 
 
 # ---------------------------------------------------------------------------
+# Diagnostic probe helpers (RATE_SCALE integer outputs)
+# ---------------------------------------------------------------------------
+
+RATE_SCALE = 1_000_000
+
+
+def compute_donchian_position(
+    bars: List[Bar],
+    dc_upper: List[Optional[float]],
+    dc_lower: List[Optional[float]],
+    length: int = 288,
+) -> Dict[str, List[Optional[int]]]:
+    """Compute Donchian Position outputs: 7 RATE_SCALE integer lists parallel to bars.
+
+    Uses pre-computed Donchian upper/lower from the dependency indicator.
+    Mirrors Phase 4B DonchianPositionIndicator (probe 30) math.
+    """
+    n = len(bars)
+    percent_b: List[Optional[int]] = [None] * n
+    bars_since_upper: List[Optional[int]] = [None] * n
+    bars_since_lower: List[Optional[int]] = [None] * n
+    retrace_from_lower: List[Optional[int]] = [None] * n
+    retrace_from_upper: List[Optional[int]] = [None] * n
+    new_upper: List[Optional[int]] = [None] * n
+    new_lower: List[Optional[int]] = [None] * n
+
+    prev_upper_c: Optional[int] = None
+    prev_lower_c: Optional[int] = None
+
+    for i in range(n):
+        if dc_upper[i] is None or dc_lower[i] is None:
+            continue
+
+        upper = dc_upper[i]
+        lower = dc_lower[i]
+        close = bars[i].close
+
+        # Convert to integer cents for truncate-division matching engine
+        close_c = int(round(close * 100))
+        upper_c = int(round(upper * 100))
+        lower_c = int(round(lower * 100))
+        range_c = upper_c - lower_c
+
+        # percent_b
+        if range_c > 0:
+            percent_b[i] = (close_c - lower_c) * RATE_SCALE // range_c
+        else:
+            percent_b[i] = RATE_SCALE // 2
+
+        # bars_since — forward scan oldest→newest, first match = earliest occurrence
+        start = max(0, i - length + 1)
+        bsu = i - start
+        for j in range(start, i + 1):
+            if bars[j].high == upper:  # exact float equality OK (max of same values)
+                bsu = i - j
+                break
+        bars_since_upper[i] = bsu
+
+        bsl = i - start
+        for j in range(start, i + 1):
+            if bars[j].low == lower:
+                bsl = i - j
+                break
+        bars_since_lower[i] = bsl
+
+        # retrace from lower/upper
+        retrace_from_lower[i] = (close_c - lower_c) * RATE_SCALE // lower_c if lower_c > 0 else 0
+        retrace_from_upper[i] = (upper_c - close_c) * RATE_SCALE // upper_c if upper_c > 0 else 0
+
+        # new_upper / new_lower transitions
+        new_upper[i] = RATE_SCALE if (prev_upper_c is not None and upper_c != prev_upper_c) else 0
+        new_lower[i] = RATE_SCALE if (prev_lower_c is not None and lower_c != prev_lower_c) else 0
+
+        prev_upper_c = upper_c
+        prev_lower_c = lower_c
+
+    return {
+        "percent_b": percent_b,
+        "bars_since_upper": bars_since_upper,
+        "bars_since_lower": bars_since_lower,
+        "retrace_from_lower": retrace_from_lower,
+        "retrace_from_upper": retrace_from_upper,
+        "new_upper": new_upper,
+        "new_lower": new_lower,
+    }
+
+
+def compute_vol_regime(
+    bars: List[Bar],
+    dc_upper: List[Optional[float]],
+    dc_lower: List[Optional[float]],
+    reference_vol_microbps: int = 3_333_365,
+) -> Dict[str, List[Optional[int]]]:
+    """Compute Volatility Regime: vol_ratio as RATE_SCALE integer list.
+
+    Mirrors Phase 4B VolRegimeIndicator (probe 31) math:
+    vol_ratio = dc_range * 100 * RATE_SCALE * 1_000_000 // (close * reference_vol_microbps)
+    """
+    n = len(bars)
+    vol_ratio: List[Optional[int]] = [None] * n
+
+    for i in range(n):
+        if dc_upper[i] is None or dc_lower[i] is None:
+            continue
+        close = bars[i].close
+        if close <= 0:
+            continue
+
+        upper_c = int(round(dc_upper[i] * 100))
+        lower_c = int(round(dc_lower[i] * 100))
+        close_c = int(round(close * 100))
+        range_c = upper_c - lower_c
+
+        vol_ratio[i] = range_c * 100 * RATE_SCALE * 1_000_000 // (close_c * reference_vol_microbps)
+
+    return {"vol_ratio": vol_ratio}
+
+
+# ---------------------------------------------------------------------------
 # Indicator computation for a resolved config
 # ---------------------------------------------------------------------------
 
 def compute_indicator_outputs(
     instance: dict,
     bars: List[Bar],
+    dep_outputs: Optional[Dict[str, List]] = None,
 ) -> Dict[str, List[Optional[float]]]:
     """Compute all outputs for an indicator instance on resampled bars."""
     ind_id = instance["indicator_id"]
@@ -492,16 +612,16 @@ def compute_indicator_outputs(
     result = {}
 
     if ind_id == 1:  # EMA
-        period = params.get("period", 20)
+        period = params.get("period", params.get("length", 20))
         ema_vals = compute_ema(closes, period)
         result["ema"] = ema_vals
 
     elif ind_id == 2:  # RSI
-        period = params.get("period", 14)
+        period = params.get("period", params.get("length", 14))
         result["rsi"] = compute_rsi(closes, period)
 
     elif ind_id == 3:  # ATR
-        period = params.get("period", 14)
+        period = params.get("period", params.get("length", 14))
         result["atr"] = compute_atr(highs, lows, closes, period)
 
     elif ind_id == 7:  # MACD
@@ -516,7 +636,7 @@ def compute_indicator_outputs(
         result["signal_slope_sign"] = sss
 
     elif ind_id == 8:  # ROC
-        period = params.get("period", 14)
+        period = params.get("period", params.get("length", 14))
         roc_vals = [None] * len(closes)
         for i in range(period, len(closes)):
             if closes[i - period] != 0:
@@ -524,11 +644,11 @@ def compute_indicator_outputs(
         result["roc"] = roc_vals
 
     elif ind_id == 10:  # Choppiness
-        period = params.get("period", 14)
+        period = params.get("period", params.get("length", 14))
         result["choppiness"] = compute_choppiness(highs, lows, closes, period)
 
     elif ind_id == 11:  # Bollinger
-        period = params.get("period", 20)
+        period = params.get("period", params.get("length", 20))
         num_std = params.get("num_std", 2.0)
         basis, upper, lower, bw, pb = compute_bollinger(closes, period, num_std)
         result["basis"] = basis
@@ -538,11 +658,11 @@ def compute_indicator_outputs(
         result["percent_b"] = pb
 
     elif ind_id == 12:  # LinReg
-        period = params.get("period", 14)
+        period = params.get("period", params.get("length", 14))
         result["slope"] = compute_linreg_slope(closes, period)
 
     elif ind_id == 14:  # Donchian
-        period = params.get("period", 20)
+        period = params.get("period", params.get("length", 20))
         upper, lower, basis = compute_donchian(highs, lows, period)
         result["upper"] = upper
         result["lower"] = lower
@@ -553,6 +673,26 @@ def compute_indicator_outputs(
         lmagr, lmagr_pct = compute_lmagr(closes, ma_length)
         result["lmagr"] = lmagr
         result["lmagr_pct"] = lmagr_pct
+
+    elif ind_id == 30:  # Donchian Position (diagnostic probe, depends on 14)
+        length = params.get("length", params.get("period", 288))
+        if dep_outputs is not None:
+            dc_upper = dep_outputs.get("upper", [None] * len(bars))
+            dc_lower = dep_outputs.get("lower", [None] * len(bars))
+        else:
+            # Fallback: compute Donchian ourselves
+            dc_upper, dc_lower, _ = compute_donchian(highs, lows, length)
+        result = compute_donchian_position(bars, dc_upper, dc_lower, length)
+
+    elif ind_id == 31:  # Volatility Regime (diagnostic probe, depends on 14)
+        ref = params.get("reference_vol_microbps", 3_333_365)
+        if dep_outputs is not None:
+            dc_upper = dep_outputs.get("upper", [None] * len(bars))
+            dc_lower = dep_outputs.get("lower", [None] * len(bars))
+        else:
+            dc_period = params.get("length", params.get("period", 288))
+            dc_upper, dc_lower, _ = compute_donchian(highs, lows, dc_period)
+        result = compute_vol_regime(bars, dc_upper, dc_lower, ref)
 
     else:
         # Stub: return None for all outputs
@@ -621,6 +761,17 @@ def run_backtest(
     exec_params = resolved_config.get("execution_params", {})
     flip_enabled = exec_params.get("flip_enabled", False)
 
+    # ATR / execution_params stop-loss config
+    sl_config = exec_params.get("stop_loss") or {}
+    sl_mode = sl_config.get("mode")  # "ATR_MULTIPLE" or "FIXED_PERCENT" or None
+    sl_atr_multiple = float(sl_config.get("atr_multiple", 1.5))
+    sl_atr_label = sl_config.get("atr_indicator_label")
+    sl_fixed_percent = float(sl_config.get("fixed_percent", 0.0))
+
+    # Post-exit cooldown
+    cooldown_bars = exec_params.get("post_exit_cooldown_bars", 0)
+    last_exit_eval_bar = -999999
+
     # Determine evaluation cadence (from entry rules, default 1m)
     eval_cadence_sec = 60
     for rule in entry_rules:
@@ -639,17 +790,15 @@ def run_backtest(
     # This avoids the bucket alignment issues with non-minute-aligned start times.
     instance_ts_to_rsidx: Dict[str, Dict[int, int]] = {}
 
-    for inst in instances:
+    def _resample_and_map(inst: dict) -> None:
+        """Resample bars and build ts→index map for an indicator instance."""
         label = inst["label"]
         tf = inst.get("timeframe", "1m")
         tf_sec = parse_timeframe_seconds(tf)
         instance_tf_sec[label] = tf_sec
         resampled = resample_bars(bars_1m, tf_sec)
         instance_bars[label] = resampled
-        instance_outputs[label] = compute_indicator_outputs(inst, resampled)
-
-        # Build ts → resampled index: for each 1m bar, find the latest resampled
-        # bar whose ts <= 1m bar's ts.
+        # Build ts → resampled index
         ts_map: Dict[int, int] = {}
         rs_idx = 0
         for bar_1m in bars_1m:
@@ -659,6 +808,35 @@ def run_backtest(
             if rs_idx < len(resampled) and resampled[rs_idx].ts <= bar_1m.ts:
                 ts_map[bar_1m.ts] = rs_idx
         instance_ts_to_rsidx[label] = ts_map
+
+    # Pass 1: base indicators (ind_id < 26)
+    for inst in instances:
+        ind_id = inst["indicator_id"]
+        if isinstance(ind_id, str):
+            ind_id = INDICATOR_NAME_TO_ID.get(ind_id, -1)
+        if ind_id >= 26:
+            continue  # Defer to pass 2
+        _resample_and_map(inst)
+        instance_outputs[inst["label"]] = compute_indicator_outputs(
+            inst, instance_bars[inst["label"]])
+
+    # Pass 2: dependent probes (ind_id >= 26) — resolve donchian_label dependency
+    for inst in instances:
+        ind_id = inst["indicator_id"]
+        if isinstance(ind_id, str):
+            ind_id = INDICATOR_NAME_TO_ID.get(ind_id, -1)
+        if ind_id < 26:
+            continue  # Already done
+        _resample_and_map(inst)
+        label = inst["label"]
+        params = inst.get("parameters", {})
+        dep_out = None
+        if ind_id in (30, 31):
+            dc_label = params.get("donchian_label")
+            if dc_label and dc_label in instance_outputs:
+                dep_out = instance_outputs[dc_label]
+        instance_outputs[label] = compute_indicator_outputs(
+            inst, instance_bars[label], dep_outputs=dep_out)
 
     # Compute effective warmup in 1m bars
     max_warmup_1m = 0
@@ -689,6 +867,9 @@ def run_backtest(
 
     # Trailing stop tracking
     trailing_peak = 0.0
+
+    # Execution-params stop price (computed at entry from ATR or fixed percent)
+    ep_stop_price: Optional[float] = None
 
     for bar_1m_idx, bar in enumerate(bars_1m):
         # Skip warmup
@@ -751,7 +932,16 @@ def run_backtest(
             else:
                 trailing_peak = min(trailing_peak, current_close) if trailing_peak > 0 else current_close
 
+            # Execution-params ATR/fixed stop (computed at entry, checked every bar)
+            if ep_stop_price is not None:
+                if direction == "LONG" and current_close <= ep_stop_price:
+                    exit_override_reason = "STOP_LOSS"
+                elif direction == "SHORT" and current_close >= ep_stop_price:
+                    exit_override_reason = "STOP_LOSS"
+
             for exit_rule in exit_rules:
+                if exit_override_reason is not None:
+                    break
                 et = exit_rule.get("type", "SIGNAL")
 
                 if et == "STOP_LOSS":
@@ -826,16 +1016,54 @@ def run_backtest(
                 current_price=round(bar.close * 100) if position else None,
             )
 
+        # Helper: compute ATR-based stop price at entry
+        def _compute_atr_stop(direction: str, entry_px: float) -> Optional[float]:
+            # Check execution_params stop_loss
+            if sl_mode == "ATR_MULTIPLE" and sl_atr_label:
+                atr_out = indicator_outputs.get(sl_atr_label, {})
+                atr_val = atr_out.get("atr")
+                if atr_val is not None:
+                    if direction == "LONG":
+                        return entry_px - atr_val * sl_atr_multiple
+                    else:
+                        return entry_px + atr_val * sl_atr_multiple
+            elif sl_mode == "FIXED_PERCENT" and sl_fixed_percent > 0:
+                if direction == "LONG":
+                    return entry_px * (1 - sl_fixed_percent)
+                else:
+                    return entry_px * (1 + sl_fixed_percent)
+            # Check exit rules for ATR_MULTIPLE mode
+            for rule in exit_rules:
+                if rule.get("type") != "STOP_LOSS":
+                    continue
+                rp = rule.get("parameters", {})
+                if rp.get("mode") == "ATR_MULTIPLE":
+                    lbl = rp.get("atr_indicator_label")
+                    mult = float(rp.get("atr_multiple", 1.5))
+                    if lbl and lbl in indicator_outputs:
+                        atr_val = indicator_outputs[lbl].get("atr")
+                        if atr_val is not None:
+                            if direction == "LONG":
+                                return entry_px - atr_val * mult
+                            else:
+                                return entry_px + atr_val * mult
+            return None
+
         # Process signal
         if signal.action == "ENTRY" and position is None:
-            position = {
-                "direction": signal.direction,
-                "entry_price": bar.close,
-                "entry_idx": bar_1m_idx,
-            }
-            position_entry_eval_bar = eval_bar_count
-            trailing_peak = bar.close
-            mtm_tracker.open_position()
+            # Cooldown check: skip entry if within cooldown period after last exit
+            if cooldown_bars > 0 and (eval_bar_count - last_exit_eval_bar) < cooldown_bars:
+                pass  # Suppress entry due to cooldown
+            else:
+                position = {
+                    "direction": signal.direction,
+                    "entry_price": bar.close,
+                    "entry_idx": bar_1m_idx,
+                }
+                position_entry_eval_bar = eval_bar_count
+                trailing_peak = bar.close
+                ep_stop_price = _compute_atr_stop(signal.direction, bar.close)
+                mtm_tracker.open_position()
 
         elif signal.action == "EXIT" and position is not None:
             # Close trade
@@ -843,8 +1071,10 @@ def run_backtest(
                 position, bar_1m_idx, bar.close, strategy_hash)
             trades.append(trade)
             mtm_tracker.close_position()
+            last_exit_eval_bar = eval_bar_count
             position = None
             trailing_peak = 0.0
+            ep_stop_price = None
 
         elif signal.action == "FLIP" and position is not None:
             # Close current, open opposite
@@ -852,6 +1082,7 @@ def run_backtest(
                 position, bar_1m_idx, bar.close, strategy_hash)
             trades.append(trade)
             mtm_tracker.close_position()
+            # FLIP does NOT trigger cooldown
 
             # Open opposite
             position = {
@@ -861,6 +1092,7 @@ def run_backtest(
             }
             position_entry_eval_bar = eval_bar_count
             trailing_peak = bar.close
+            ep_stop_price = _compute_atr_stop(signal.direction, bar.close)
             mtm_tracker.open_position()
 
         prev_outputs = indicator_outputs

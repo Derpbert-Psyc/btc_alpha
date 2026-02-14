@@ -167,7 +167,8 @@ body {
 .tier-badge-a { background: linear-gradient(135deg, #059669, #10b981) !important; color: white !important; border: 1px solid #10b981; font-weight: 700; }
 .tier-badge-b { background: linear-gradient(135deg, #2563eb, #3b82f6) !important; color: white !important; border: 1px solid #3b82f6; font-weight: 700; }
 /* Frozen first column in strategy list */
-.strategy-table .q-table__container { overflow-x: auto; }
+.strategy-table.q-table { overflow: visible !important; }
+.strategy-table .q-table__container { overflow-x: auto; border-radius: 10px; }
 .strategy-table thead th:first-child,
 .strategy-table tbody td:first-child {
     position: sticky;

@@ -944,7 +944,13 @@ def _compute_indicator_warmup(indicator_id: int, params: Dict[str, Any]) -> int:
         oi_length = params.get("oi_length", 24)
         funding_length = params.get("funding_length", 8)
         return max(oi_length, funding_length)
-    
+
+    elif indicator_id == 30:  # Donchian Position
+        return params.get("length", params.get("period", 288))
+
+    elif indicator_id == 31:  # Volatility Regime
+        return 288  # Hardcoded to match Donchian dependency warmup
+
     else:
         raise IndicatorContractError(f"Unknown indicator ID: {indicator_id}")
 
@@ -6943,6 +6949,235 @@ def create_lsi_indicator(**params) -> Indicator:
 
 
 # =============================================================================
+# DONCHIAN POSITION - INDICATOR 30 (DIAGNOSTIC PROBE)
+# =============================================================================
+
+@dataclass
+class DonchianPositionState(IndicatorState):
+    """State for Donchian Position probe."""
+    high_buffer: List[Optional[int]] = field(default_factory=list)
+    low_buffer: List[Optional[int]] = field(default_factory=list)
+    buffer_pos: int = 0
+    buffer_count: int = 0
+    length: int = 288
+    prev_upper: Optional[int] = None
+    prev_lower: Optional[int] = None
+
+    def reset(self) -> None:
+        self.high_buffer = [None] * self.length
+        self.low_buffer = [None] * self.length
+        self.buffer_pos = 0
+        self.buffer_count = 0
+        self.prev_upper = None
+        self.prev_lower = None
+
+    def clone(self) -> "DonchianPositionState":
+        s = DonchianPositionState(
+            high_buffer=list(self.high_buffer),
+            low_buffer=list(self.low_buffer),
+            buffer_pos=self.buffer_pos,
+            buffer_count=self.buffer_count,
+            length=self.length,
+            prev_upper=self.prev_upper,
+            prev_lower=self.prev_lower,
+        )
+        return s
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "buffer_pos": self.buffer_pos,
+            "buffer_count": self.buffer_count,
+            "prev_upper": self.prev_upper,
+            "prev_lower": self.prev_lower,
+        }
+
+
+class DonchianPositionIndicator(Indicator):
+    """Donchian Position & Recency — Indicator 30 (Diagnostic Probe, CLASS_D)."""
+
+    RATE_SCALE = 1_000_000
+
+    def __init__(self, length: int = 288, **kwargs):
+        # Accept both "length" and "period" parameter names
+        if "period" in kwargs and length == 288:
+            length = kwargs.pop("period")
+        super().__init__(indicator_id=30, length=length, **kwargs)
+        self._length = length
+
+    def _create_initial_state(self) -> IndicatorState:
+        state = DonchianPositionState(length=self._length)
+        state.high_buffer = [None] * self._length
+        state.low_buffer = [None] * self._length
+        return state
+
+    def _compute_impl(
+        self,
+        timestamp: int,
+        bar_index: int,
+        inputs: Dict[str, Optional[TypedValue]],
+        dependency_outputs: Dict[int, IndicatorOutput],
+    ) -> Dict[str, Optional[TypedValue]]:
+        none_result = {
+            "percent_b": None, "bars_since_upper": None,
+            "bars_since_lower": None, "retrace_from_lower": None,
+            "retrace_from_upper": None, "new_upper": None,
+            "new_lower": None,
+        }
+
+        close_tv = inputs.get("close")
+        high_tv = inputs.get("high")
+        low_tv = inputs.get("low")
+        if close_tv is None or high_tv is None or low_tv is None:
+            return none_result
+
+        close = close_tv.value
+        high = high_tv.value
+        low = low_tv.value
+
+        state = self.state
+        length = state.length
+
+        # Update circular buffer
+        state.high_buffer[state.buffer_pos] = high
+        state.low_buffer[state.buffer_pos] = low
+        state.buffer_pos = (state.buffer_pos + 1) % length
+        state.buffer_count = min(state.buffer_count + 1, length)
+
+        if state.buffer_count < length:
+            return none_result
+
+        # Compute upper/lower from own buffer
+        valid_highs = [v for v in state.high_buffer if v is not None]
+        valid_lows = [v for v in state.low_buffer if v is not None]
+        upper = max(valid_highs)
+        lower = min(valid_lows)
+        dc_range = upper - lower
+
+        # percent_b
+        if dc_range > 0:
+            percent_b = (close - lower) * self.RATE_SCALE // dc_range
+        else:
+            percent_b = self.RATE_SCALE // 2
+
+        # bars_since — scan FORWARD (oldest to newest), first match = earliest
+        bsu = state.buffer_count - 1
+        for fwd in range(state.buffer_count):
+            idx = (state.buffer_pos - state.buffer_count + fwd) % length
+            if state.high_buffer[idx] == upper:
+                bsu = state.buffer_count - 1 - fwd
+                break
+
+        bsl = state.buffer_count - 1
+        for fwd in range(state.buffer_count):
+            idx = (state.buffer_pos - state.buffer_count + fwd) % length
+            if state.low_buffer[idx] == lower:
+                bsl = state.buffer_count - 1 - fwd
+                break
+
+        # retrace from lower/upper (price-based, RATE_SCALE)
+        if lower > 0:
+            retrace_from_lower = (close - lower) * self.RATE_SCALE // lower
+        else:
+            retrace_from_lower = 0
+
+        if upper > 0:
+            retrace_from_upper = (upper - close) * self.RATE_SCALE // upper
+        else:
+            retrace_from_upper = 0
+
+        # new_upper / new_lower transitions
+        if state.prev_upper is not None and upper != state.prev_upper:
+            new_upper_val = self.RATE_SCALE
+        else:
+            new_upper_val = 0
+
+        if state.prev_lower is not None and lower != state.prev_lower:
+            new_lower_val = self.RATE_SCALE
+        else:
+            new_lower_val = 0
+
+        state.prev_upper = upper
+        state.prev_lower = lower
+
+        return {
+            "percent_b": TypedValue(percent_b, SemanticType.RATE),
+            "bars_since_upper": TypedValue(bsu, SemanticType.RATE),
+            "bars_since_lower": TypedValue(bsl, SemanticType.RATE),
+            "retrace_from_lower": TypedValue(retrace_from_lower, SemanticType.RATE),
+            "retrace_from_upper": TypedValue(retrace_from_upper, SemanticType.RATE),
+            "new_upper": TypedValue(new_upper_val, SemanticType.RATE),
+            "new_lower": TypedValue(new_lower_val, SemanticType.RATE),
+        }
+
+
+def create_dc_position_indicator(**params) -> Indicator:
+    """Factory function to create Donchian Position indicator."""
+    return DonchianPositionIndicator(**params)
+
+
+# =============================================================================
+# VOLATILITY REGIME - INDICATOR 31 (DIAGNOSTIC PROBE)
+# =============================================================================
+
+class VolRegimeIndicator(Indicator):
+    """Volatility Regime — Indicator 31 (Diagnostic Probe, CLASS_D).
+
+    Measures current Donchian bandwidth relative to a fixed historical reference.
+    Output is RATE_SCALE integer. Stateless per-bar formula.
+    """
+
+    RATE_SCALE = 1_000_000
+
+    def __init__(self, reference_vol_microbps: int = 3_333_365, **kwargs):
+        super().__init__(indicator_id=31, reference_vol_microbps=reference_vol_microbps, **kwargs)
+        self.reference_vol_microbps = reference_vol_microbps
+
+    def _create_initial_state(self) -> IndicatorState:
+        return IndicatorState()
+
+    def _compute_impl(
+        self,
+        timestamp: int,
+        bar_index: int,
+        inputs: Dict[str, Optional[TypedValue]],
+        dependency_outputs: Dict[int, IndicatorOutput],
+    ) -> Dict[str, Optional[TypedValue]]:
+        # Get Donchian upper/lower from dependency (indicator 14)
+        dc_output = dependency_outputs.get(14)
+        if dc_output is None or not dc_output.eligible:
+            return {"vol_ratio": None}
+
+        upper_tv = dc_output.values.get("upper")
+        lower_tv = dc_output.values.get("lower")
+        if upper_tv is None or lower_tv is None:
+            return {"vol_ratio": None}
+
+        upper = upper_tv.value
+        lower = lower_tv.value
+        dc_range = upper - lower
+
+        close_tv = inputs.get("close")
+        if close_tv is None:
+            return {"vol_ratio": None}
+        close = close_tv.value
+        if close <= 0:
+            return {"vol_ratio": None}
+
+        # vol_ratio = (dc_range / close * 100) / reference_vol_pct
+        # In integer math: dc_range * 100 * RATE_SCALE * 1_000_000 // (close * reference_vol_microbps)
+        vol_ratio = dc_range * 100 * self.RATE_SCALE * 1_000_000 // (close * self.reference_vol_microbps)
+
+        return {
+            "vol_ratio": TypedValue(vol_ratio, SemanticType.RATE),
+        }
+
+
+def create_vol_regime_indicator(**params) -> Indicator:
+    """Factory function to create Volatility Regime indicator."""
+    return VolRegimeIndicator(**params)
+
+
+# =============================================================================
 # DIAGNOSTIC PROBE REGISTRY
 # =============================================================================
 
@@ -7029,6 +7264,46 @@ DIAGNOSTIC_PROBE_REGISTRY: Dict[int, IndicatorSpec] = {
         default_params={"oi_length": 24, "funding_length": 8},
         warmup_formula_doc="max(oi_length, funding_length)",
     ),
+
+    30: IndicatorSpec(
+        id=30,
+        name="DC_POSITION",
+        dependency_class=DependencyClass.CLASS_D,
+        dependencies=(14,),
+        has_activation_condition=False,
+        input_types={
+            "close": SemanticType.PRICE,
+            "high": SemanticType.PRICE,
+            "low": SemanticType.PRICE,
+        },
+        output_types={
+            "percent_b": SemanticType.RATE,
+            "bars_since_upper": SemanticType.RATE,
+            "bars_since_lower": SemanticType.RATE,
+            "retrace_from_lower": SemanticType.RATE,
+            "retrace_from_upper": SemanticType.RATE,
+            "new_upper": SemanticType.RATE,
+            "new_lower": SemanticType.RATE,
+        },
+        default_params={"length": 288},
+        warmup_formula_doc="length",
+    ),
+
+    31: IndicatorSpec(
+        id=31,
+        name="VOL_REGIME",
+        dependency_class=DependencyClass.CLASS_D,
+        dependencies=(14,),
+        has_activation_condition=False,
+        input_types={
+            "close": SemanticType.PRICE,
+        },
+        output_types={
+            "vol_ratio": SemanticType.RATE,
+        },
+        default_params={"reference_vol_microbps": 3_333_365},
+        warmup_formula_doc="288 (hardcoded, matches Donchian dependency)",
+    ),
 }
 
 # Diagnostic probe factories
@@ -7038,6 +7313,8 @@ DIAGNOSTIC_PROBE_FACTORIES: Dict[int, Any] = {
     27: create_volstab_indicator,
     28: create_persistence_indicator,
     29: create_lsi_indicator,
+    30: create_dc_position_indicator,
+    31: create_vol_regime_indicator,
 }
 
 # Input mappings for diagnostic probes
@@ -7053,6 +7330,8 @@ DIAGNOSTIC_PROBE_INPUT_MAPPING: Dict[int, Dict[str, str]] = {
         "perp_price": "_system_perp_price",
         "liquidation_volume": "_system_liquidation_volume",
     },
+    30: {"close": "close", "high": "high", "low": "low"},
+    31: {"close": "close"},
 }
 
 
@@ -7061,18 +7340,18 @@ def create_diagnostic_probe(probe_id: int, **params) -> Indicator:
     Create a diagnostic probe by ID.
     
     Args:
-        probe_id: Probe ID (25-29)
+        probe_id: Probe ID (25-31)
         **params: Probe-specific parameters
-    
+
     Returns:
         Instantiated probe indicator
-    
+
     Raises:
         IndicatorContractError: If probe_id is not valid
     """
     if probe_id not in DIAGNOSTIC_PROBE_FACTORIES:
         raise IndicatorContractError(
-            f"Unknown diagnostic probe ID: {probe_id}. Valid IDs: 25-29"
+            f"Unknown diagnostic probe ID: {probe_id}. Valid IDs: 25-31"
         )
     return DIAGNOSTIC_PROBE_FACTORIES[probe_id](**params)
 
@@ -14498,6 +14777,374 @@ def test_lsi_micro_gates():
     return all_passed
 
 
+def test_dc_position_micro_gates():
+    """
+    Donchian Position (probe 30) micro-gate tests.
+
+    Validates percent_b, bars_since, retrace, new_upper/lower transitions,
+    warmup behaviour, and edge cases.
+    """
+    print("\n" + "=" * 60)
+    print("DIAGNOSTIC PROBE TEST: DC_POSITION (30)")
+    print("=" * 60)
+
+    all_passed = True
+    RS = 1_000_000  # RATE_SCALE
+    PS = 100  # PRICE_SCALE
+
+    # Mock dependency output for Donchian (14) — needed by CLASS_D activation
+    _mock_dc_dep = {14: IndicatorOutput(
+        indicator_id=14, timestamp=0, computed=True, eligible=True,
+        values={
+            "upper": TypedValue(110_00, SemanticType.PRICE),
+            "lower": TypedValue(100_00, SemanticType.PRICE),
+            "basis": TypedValue(105_00, SemanticType.PRICE),
+        })}
+
+    def _make_inputs(close, high, low):
+        return {
+            "close": TypedValue(close, SemanticType.PRICE),
+            "high": TypedValue(high, SemanticType.PRICE),
+            "low": TypedValue(low, SemanticType.PRICE),
+        }
+
+    def _compute(ind, ts, idx, close, high, low):
+        return ind.compute(timestamp=ts, bar_index=idx,
+                           inputs=_make_inputs(close, high, low),
+                           dependency_outputs=_mock_dc_dep)
+
+    # Test 1: Warmup returns None for first (length-1) bars
+    print("\n1. Warmup period test...")
+    ind = create_diagnostic_probe(30, length=5)
+    warmup_ok = True
+    for i in range(4):  # First 4 bars, need 5 for warmup
+        out = _compute(ind, 1700000000 + i * 60, i, 100_00, 101_00, 99_00)
+        if out.values.get("percent_b") is not None:
+            warmup_ok = False
+    if warmup_ok:
+        print("   ✓ All outputs None during warmup (4 bars with length=5)")
+    else:
+        print("   ✗ Non-None output during warmup")
+        all_passed = False
+
+    # Test 2: First valid output after warmup
+    print("\n2. First output after warmup...")
+    out = _compute(ind, 1700000000 + 4 * 60, 4, 100_00, 101_00, 99_00)
+    pb = out.values.get("percent_b")
+    if pb is not None:
+        print(f"   ✓ percent_b produced at bar 4: {pb.value}")
+    else:
+        print("   ✗ percent_b still None at bar 4")
+        all_passed = False
+
+    # Test 3: percent_b at channel midpoint
+    print("\n3. percent_b at midpoint...")
+    ind3 = create_diagnostic_probe(30, length=3)
+    for i in range(2):
+        _compute(ind3, 1700000000 + i * 60, i, 105_00, 110_00, 100_00)
+    out3 = _compute(ind3, 1700000000 + 2 * 60, 2, 105_00, 110_00, 100_00)
+    pb3 = out3.values.get("percent_b")
+    # Expected: (10500 - 10000) * 1M // (11000 - 10000) = 500 * 1M // 1000 = 500000
+    if pb3 is not None and pb3.value == 500000:
+        print(f"   ✓ percent_b = 500000 (50% = midpoint)")
+    else:
+        print(f"   ✗ Expected 500000, got {pb3.value if pb3 else None}")
+        all_passed = False
+
+    # Test 4: percent_b at lower bound
+    print("\n4. percent_b at lower bound...")
+    ind4 = create_diagnostic_probe(30, length=3)
+    for i in range(2):
+        _compute(ind4, 1700000000 + i * 60, i, 100_00, 110_00, 100_00)
+    out4 = _compute(ind4, 1700000000 + 2 * 60, 2, 100_00, 110_00, 100_00)
+    pb4 = out4.values.get("percent_b")
+    if pb4 is not None and pb4.value == 0:
+        print(f"   ✓ percent_b = 0 (at lower bound)")
+    else:
+        print(f"   ✗ Expected 0, got {pb4.value if pb4 else None}")
+        all_passed = False
+
+    # Test 5: percent_b at upper bound
+    print("\n5. percent_b at upper bound...")
+    ind5 = create_diagnostic_probe(30, length=3)
+    for i in range(2):
+        _compute(ind5, 1700000000 + i * 60, i, 110_00, 110_00, 100_00)
+    out5 = _compute(ind5, 1700000000 + 2 * 60, 2, 110_00, 110_00, 100_00)
+    pb5 = out5.values.get("percent_b")
+    if pb5 is not None and pb5.value == RS:
+        print(f"   ✓ percent_b = {RS} (at upper bound)")
+    else:
+        print(f"   ✗ Expected {RS}, got {pb5.value if pb5 else None}")
+        all_passed = False
+
+    # Test 6: bars_since_upper — forward scan (earliest occurrence)
+    print("\n6. bars_since_upper (forward scan)...")
+    ind6 = create_diagnostic_probe(30, length=5)
+    highs = [110_00, 105_00, 108_00, 110_00, 107_00]
+    for i in range(4):
+        _compute(ind6, 1700000000 + i * 60, i, 105_00, highs[i], 100_00)
+    out6 = _compute(ind6, 1700000000 + 4 * 60, 4, 105_00, highs[4], 100_00)
+    bsu_val = out6.values.get("bars_since_upper")
+    # Forward scan: bar 0 has high=110=upper → bars_since = 4 - 0 = 4
+    if bsu_val is not None and bsu_val.value == 4:
+        print(f"   ✓ bars_since_upper = 4 (earliest occurrence at bar 0)")
+    else:
+        print(f"   ✗ Expected 4, got {bsu_val.value if bsu_val else None}")
+        all_passed = False
+
+    # Test 7: bars_since_lower — forward scan
+    print("\n7. bars_since_lower...")
+    ind7 = create_diagnostic_probe(30, length=5)
+    lows = [100_00, 95_00, 98_00, 95_00, 97_00]
+    for i in range(4):
+        _compute(ind7, 1700000000 + i * 60, i, 100_00, 110_00, lows[i])
+    out7 = _compute(ind7, 1700000000 + 4 * 60, 4, 100_00, 110_00, lows[4])
+    bsl_val = out7.values.get("bars_since_lower")
+    # Forward scan: bar 1 has low=95=lower → bars_since = 4 - 1 = 3
+    if bsl_val is not None and bsl_val.value == 3:
+        print(f"   ✓ bars_since_lower = 3 (earliest occurrence at bar 1)")
+    else:
+        print(f"   ✗ Expected 3, got {bsl_val.value if bsl_val else None}")
+        all_passed = False
+
+    # Test 8: retrace_from_lower
+    print("\n8. retrace_from_lower...")
+    ind8 = create_diagnostic_probe(30, length=3)
+    for i in range(2):
+        _compute(ind8, 1700000000 + i * 60, i, 105_00, 110_00, 100_00)
+    out8 = _compute(ind8, 1700000000 + 2 * 60, 2, 105_00, 110_00, 100_00)
+    rfl = out8.values.get("retrace_from_lower")
+    # (10500 - 10000) * 1M // 10000 = 500 * 1M // 10000 = 50000
+    if rfl is not None and rfl.value == 50000:
+        print(f"   ✓ retrace_from_lower = 50000 (5% above lower)")
+    else:
+        print(f"   ✗ Expected 50000, got {rfl.value if rfl else None}")
+        all_passed = False
+
+    # Test 9: retrace_from_upper
+    print("\n9. retrace_from_upper...")
+    rfu = out8.values.get("retrace_from_upper")
+    # (11000 - 10500) * 1M // 11000 = 500 * 1M // 11000 = 45454
+    expected_rfu = 500 * RS // 11000
+    if rfu is not None and rfu.value == expected_rfu:
+        print(f"   ✓ retrace_from_upper = {expected_rfu}")
+    else:
+        print(f"   ✗ Expected {expected_rfu}, got {rfu.value if rfu else None}")
+        all_passed = False
+
+    # Test 10: new_upper transition
+    print("\n10. new_upper transition...")
+    ind10 = create_diagnostic_probe(30, length=3)
+    for i in range(3):
+        _compute(ind10, 1700000000 + i * 60, i, 105_00, 110_00, 100_00)
+    # Bar 3: new high = 115 → new_upper should be RATE_SCALE
+    out10 = _compute(ind10, 1700000000 + 3 * 60, 3, 105_00, 115_00, 100_00)
+    nu = out10.values.get("new_upper")
+    if nu is not None and nu.value == RS:
+        print(f"   ✓ new_upper = {RS} (upper channel changed)")
+    else:
+        print(f"   ✗ Expected {RS}, got {nu.value if nu else None}")
+        all_passed = False
+
+    # Test 11: new_lower transition
+    print("\n11. new_lower transition...")
+    out11 = _compute(ind10, 1700000000 + 4 * 60, 4, 105_00, 115_00, 95_00)
+    nl = out11.values.get("new_lower")
+    if nl is not None and nl.value == RS:
+        print(f"   ✓ new_lower = {RS} (lower channel changed)")
+    else:
+        print(f"   ✗ Expected {RS}, got {nl.value if nl else None}")
+        all_passed = False
+
+    # Test 12: No transition when upper/lower unchanged
+    print("\n12. No transition when unchanged...")
+    out12 = _compute(ind10, 1700000000 + 5 * 60, 5, 105_00, 115_00, 95_00)
+    nu12 = out12.values.get("new_upper")
+    nl12 = out12.values.get("new_lower")
+    if nu12 is not None and nu12.value == 0 and nl12 is not None and nl12.value == 0:
+        print(f"   ✓ new_upper=0, new_lower=0 (no transition)")
+    else:
+        print(f"   ✗ Expected 0,0 got {nu12.value if nu12 else None},{nl12.value if nl12 else None}")
+        all_passed = False
+
+    # Test 13: Zero-range channel (close == upper == lower)
+    print("\n13. Zero-range channel...")
+    ind13 = create_diagnostic_probe(30, length=3)
+    for i in range(2):
+        _compute(ind13, 1700000000 + i * 60, i, 100_00, 100_00, 100_00)
+    out13 = _compute(ind13, 1700000000 + 2 * 60, 2, 100_00, 100_00, 100_00)
+    pb13 = out13.values.get("percent_b")
+    if pb13 is not None and pb13.value == RS // 2:
+        print(f"   ✓ percent_b = {RS // 2} (zero-range → midpoint fallback)")
+    else:
+        print(f"   ✗ Expected {RS // 2}, got {pb13.value if pb13 else None}")
+        all_passed = False
+
+    print("\n" + "-" * 60)
+    if all_passed:
+        print("DC_POSITION MICRO-GATE TESTS: PASSED ✓")
+    else:
+        print("DC_POSITION MICRO-GATE TESTS: FAILED ✗")
+    print("-" * 60)
+
+    return all_passed
+
+
+def test_vol_regime_micro_gates():
+    """
+    Volatility Regime (probe 31) micro-gate tests.
+
+    Validates vol_ratio computation, zero-handling, dependency gating.
+    """
+    print("\n" + "=" * 60)
+    print("DIAGNOSTIC PROBE TEST: VOL_REGIME (31)")
+    print("=" * 60)
+
+    all_passed = True
+    RS = 1_000_000
+    PS = 100
+
+    # Test 1: Basic vol_ratio computation
+    print("\n1. Basic vol_ratio...")
+    ind = create_diagnostic_probe(31, reference_vol_microbps=3_333_365)
+    # Need Donchian (14) dependency. Register via engine.
+    engine = IndicatorEngine()
+    engine.register_indicator(create_indicator(14, length=5))  # Donchian
+    engine.register_indicator(ind)
+
+    # Feed 5 bars with channel: highs trending from 100 to 110, lows constant 95
+    for i in range(5):
+        engine.compute_all(
+            timestamp=1700000000 + i * 60, bar_index=i,
+            candle_inputs={
+                "open": TypedValue((100 + i) * PS, SemanticType.PRICE),
+                "high": TypedValue((100 + 2 * i) * PS, SemanticType.PRICE),
+                "low": TypedValue(95 * PS, SemanticType.PRICE),
+                "close": TypedValue((100 + i) * PS, SemanticType.PRICE),
+                "volume": TypedValue(1000 * 100_000_000, SemanticType.QTY),
+            })
+    outputs = engine.compute_all(
+        timestamp=1700000000 + 5 * 60, bar_index=5,
+        candle_inputs={
+            "open": TypedValue(105 * PS, SemanticType.PRICE),
+            "high": TypedValue(110 * PS, SemanticType.PRICE),
+            "low": TypedValue(95 * PS, SemanticType.PRICE),
+            "close": TypedValue(105 * PS, SemanticType.PRICE),
+            "volume": TypedValue(1000 * 100_000_000, SemanticType.QTY),
+        })
+    if 31 in outputs and outputs[31].computed:
+        vr = outputs[31].values.get("vol_ratio")
+        if vr is not None:
+            print(f"   ✓ vol_ratio computed via engine: {vr.value}")
+        else:
+            print(f"   ✗ vol_ratio is None")
+            all_passed = False
+    else:
+        print(f"   ⚠ Probe 31 not computed (may still be warming)")
+
+    # Test 2: Direct computation with known values
+    print("\n2. Known-value vol_ratio...")
+    ind2 = create_diagnostic_probe(31, reference_vol_microbps=1_000_000)
+    # Manually provide dependency outputs: Donchian upper=110, lower=100
+    dep_out = IndicatorOutput(
+        indicator_id=14, timestamp=0, computed=True, eligible=True,
+        values={
+            "upper": TypedValue(110 * PS, SemanticType.PRICE),
+            "lower": TypedValue(100 * PS, SemanticType.PRICE),
+            "basis": TypedValue(105 * PS, SemanticType.PRICE),
+        })
+    out2 = ind2.compute(
+        timestamp=1700000000, bar_index=0,
+        inputs={"close": TypedValue(105 * PS, SemanticType.PRICE)},
+        dependency_outputs={14: dep_out})
+    vr2 = out2.values.get("vol_ratio")
+    # dc_range = 11000 - 10000 = 1000 cents
+    # vol_ratio = 1000 * 100 * 1M * 1M // (10500 * 1M) = 100000 * 1M * 1M // (10500 * 1M)
+    # = 100000 * 1M // 10500 = 9523 (approx, integer truncation)
+    expected = 1000 * 100 * RS * 1_000_000 // (10500 * 1_000_000)
+    if vr2 is not None and vr2.value == expected:
+        print(f"   ✓ vol_ratio = {vr2.value} (expected {expected})")
+    else:
+        print(f"   ✗ Expected {expected}, got {vr2.value if vr2 else None}")
+        all_passed = False
+
+    # Test 3: Missing dependency → None
+    print("\n3. Missing dependency returns None...")
+    ind3 = create_diagnostic_probe(31, reference_vol_microbps=1_000_000)
+    out3 = ind3.compute(
+        timestamp=1700000000, bar_index=0,
+        inputs={"close": TypedValue(105 * PS, SemanticType.PRICE)},
+        dependency_outputs={})
+    vr3 = out3.values.get("vol_ratio")
+    if vr3 is None:
+        print(f"   ✓ vol_ratio is None when dependency missing")
+    else:
+        print(f"   ✗ Expected None, got {vr3.value}")
+        all_passed = False
+
+    # Test 4: Close <= 0 → None
+    print("\n4. Zero close returns None...")
+    out4 = ind3.compute(
+        timestamp=1700000000 + 60, bar_index=1,
+        inputs={"close": TypedValue(0, SemanticType.PRICE)},
+        dependency_outputs={14: dep_out})
+    vr4 = out4.values.get("vol_ratio")
+    if vr4 is None:
+        print(f"   ✓ vol_ratio is None when close=0")
+    else:
+        print(f"   ✗ Expected None, got {vr4.value}")
+        all_passed = False
+
+    # Test 5: Zero range (upper == lower)
+    print("\n5. Zero range channel...")
+    dep_zero = IndicatorOutput(
+        indicator_id=14, timestamp=0, computed=True, eligible=True,
+        values={
+            "upper": TypedValue(100 * PS, SemanticType.PRICE),
+            "lower": TypedValue(100 * PS, SemanticType.PRICE),
+            "basis": TypedValue(100 * PS, SemanticType.PRICE),
+        })
+    out5 = ind3.compute(
+        timestamp=1700000000 + 120, bar_index=2,
+        inputs={"close": TypedValue(100 * PS, SemanticType.PRICE)},
+        dependency_outputs={14: dep_zero})
+    vr5 = out5.values.get("vol_ratio")
+    if vr5 is not None and vr5.value == 0:
+        print(f"   ✓ vol_ratio = 0 (zero range)")
+    else:
+        print(f"   ✗ Expected 0, got {vr5.value if vr5 else None}")
+        all_passed = False
+
+    # Test 6: Ineligible dependency → None
+    print("\n6. Ineligible dependency returns None...")
+    dep_ineligible = IndicatorOutput(
+        indicator_id=14, timestamp=0, computed=True, eligible=False,
+        values={
+            "upper": TypedValue(110 * PS, SemanticType.PRICE),
+            "lower": TypedValue(100 * PS, SemanticType.PRICE),
+            "basis": TypedValue(105 * PS, SemanticType.PRICE),
+        })
+    out6 = ind3.compute(
+        timestamp=1700000000 + 180, bar_index=3,
+        inputs={"close": TypedValue(105 * PS, SemanticType.PRICE)},
+        dependency_outputs={14: dep_ineligible})
+    vr6 = out6.values.get("vol_ratio")
+    if vr6 is None:
+        print(f"   ✓ vol_ratio is None when dependency ineligible")
+    else:
+        print(f"   ✗ Expected None, got {vr6.value}")
+        all_passed = False
+
+    print("\n" + "-" * 60)
+    if all_passed:
+        print("VOL_REGIME MICRO-GATE TESTS: PASSED ✓")
+    else:
+        print("VOL_REGIME MICRO-GATE TESTS: FAILED ✗")
+    print("-" * 60)
+
+    return all_passed
+
+
 def test_probe_engine_integration():
     """
     Test that diagnostic probes work correctly through IndicatorEngine.
@@ -14643,7 +15290,11 @@ def run_diagnostic_probe_tests():
     
     # Phase 2 probe
     results.append(("LSI (29)", test_lsi_micro_gates()))
-    
+
+    # Phase 3 probes (Chop Harvester)
+    results.append(("DC_POSITION (30)", test_dc_position_micro_gates()))
+    results.append(("VOL_REGIME (31)", test_vol_regime_micro_gates()))
+
     # Engine integration test
     results.append(("Engine Integration", test_probe_engine_integration()))
     

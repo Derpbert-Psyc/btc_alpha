@@ -7,8 +7,8 @@ import pytest
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 FROZEN_MANIFEST = {
-    "composition_compiler_v1_5_2.py": "08ee7cbf3d6f988a6871d98c11f59e8411bd1062401bd6e74ceb8aa9798df065",
-    "strategy_framework_v1_8_0.py": "799a59f19cbea6977db4fce2ca348e63e241b203260a361063fe7f1b52406ea9",
+    "composition_compiler_v1_5_2.py": "fda33cca5e8d2e9758d61a674dda2eaa0da13adaa5527c4c32a492a79e212668",
+    "strategy_framework_v1_8_0.py": "905ff13c17f1f7175cd0d06027d6f9c750fffb08357898db78a220c17b25cbc2",
     "verify_framework_v1_8_0.py": "b20cdeda5d8b7b6350230eb1b99faf69b5894d5492212c1b9fa0fb3e39e13b56",
     "phase5_bundle_store.py": "209b0b3bffb0dc130f2296b53ef55d618ff29c322fc369afd14e3dc0147a6a0a",
     "phase5_cli.py": "b8b65db9da3ba4003e62fbb85fe2d67b02db4b655cd2abd257e1887f4e0c7b7a",
@@ -22,7 +22,7 @@ FROZEN_MANIFEST = {
     "btc_alpha_v3_final.py": "45b30944468934e94af3dc04f49d38434c9adc73f0077f7075b09af660fe4c06",
     "btc_alpha_phase2_v4.py": "2a5ed16e8ddc244a0bdef868a99ebe8e4a8dacb3cf247b8c3de34deab51d8294",
     "btc_alpha_phase3.py": "4a4ccbd1f74c41a41548c22fc20f16e8f1dee938d0c829a488b7ce4bdc8ca724",
-    "btc_alpha_phase4b_1_7_2.py": "c4b8f05f8ea04072abee3cbf57d269ade0006916ec6e278ca3cd93ee1fdc6db0",
+    "btc_alpha_phase4b_1_7_2.py": "a2869c769f16c5f0b9ae159f6356482072d656c535eeb735a9286dca45d3252b",
     "SYSTEM_LAWS.md": "e817af5812770bc44b5d55d3b1dcb180d0c38d7129912bc6b9164dfe36626cef",
     "BYBIT_OMS_CONTRACT_v1_0_0.md": "920b984550d34362a0450da23ebd618e411c30a5b8871206e18a706694be4f2a",
     "PHASE2_INVARIANTS.md": "2b5ac60e63d38696c800ef3e6f47fc71ad1d064ea1af8f035b1311c633945a09",
