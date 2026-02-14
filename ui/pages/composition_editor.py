@@ -20,7 +20,7 @@ from ui.services.indicator_catalog import (
     resolve_indicator_id,
 )
 from ui.components.indicator_picker import show_indicator_picker
-from ui.components.condition_builder import render_condition_builder
+from ui.components.condition_builder import render_condition_builder, _hydrate_condition
 from ui.components.exit_rule_editor import render_exit_rules
 from ui.components.gate_editor import render_gate_editor
 from ui.components.execution_form import render_execution_form
@@ -35,6 +35,75 @@ from strategy_framework_v1_8_0 import INDICATOR_OUTPUTS, INDICATOR_NAME_TO_ID
 _editor_states: Dict[str, 'EditorState'] = {}
 
 
+def _resolve_role_conditions(spec: dict) -> None:
+    """Resolve role-based conditions to indicator-based ones (for presets).
+    Modifies spec in-place. Does NOT mark dirty — this is load-time fixup.
+    """
+    instances = spec.get("indicator_instances", [])
+    if not instances:
+        return
+
+    for rule in spec.get("entry_rules", []):
+        # Resolve individual conditions with 'role' but no 'indicator'
+        for cond in rule.get("conditions", []):
+            if "role" in cond and not cond.get("indicator"):
+                role = cond["role"]
+                matching = [inst for inst in instances if inst.get("role") == role]
+                if len(matching) == 1:
+                    cond["indicator"] = matching[0]["label"]
+                # Convert string value to numeric
+                if "value" in cond and isinstance(cond["value"], str):
+                    try:
+                        cond["value"] = float(cond["value"])
+                    except (ValueError, TypeError):
+                        pass
+
+        # Expand role_conditions in condition_groups
+        for grp in rule.get("condition_groups", []):
+            if "role_condition" in grp and not grp.get("conditions"):
+                rc = grp["role_condition"]
+                role = rc.get("role", "")
+                filter_group = rc.get("filter_group", "")
+                output = rc.get("output", "")
+                operator = rc.get("operator", ">")
+                value = rc.get("value", 0)
+                if isinstance(value, str):
+                    try:
+                        value = float(value)
+                    except (ValueError, TypeError):
+                        value = 0
+
+                matching = [
+                    inst for inst in instances
+                    if inst.get("role") == role
+                    and (not filter_group or inst.get("group") == filter_group)
+                ]
+                grp["conditions"] = []
+                for inst in matching:
+                    grp["conditions"].append({
+                        "indicator": inst["label"],
+                        "output": output,
+                        "operator": operator,
+                        "value": value,
+                    })
+
+    # Also convert string values in exit and gate conditions
+    for rule in spec.get("exit_rules", []):
+        for cond in rule.get("conditions", []):
+            if "value" in cond and isinstance(cond["value"], str):
+                try:
+                    cond["value"] = float(cond["value"])
+                except (ValueError, TypeError):
+                    pass
+    for rule in spec.get("gate_rules", []):
+        for cond in rule.get("conditions", []):
+            if "value" in cond and isinstance(cond["value"], str):
+                try:
+                    cond["value"] = float(cond["value"])
+                except (ValueError, TypeError):
+                    pass
+
+
 class EditorState:
     """In-memory editor state — separate from on-disk spec."""
 
@@ -44,6 +113,7 @@ class EditorState:
         self.working_spec = copy.deepcopy(spec)
         self.last_compilation = None
         self.unsaved = False
+        self.active_tab = "Indicators"  # persists across re-renders
 
     def mark_changed(self):
         self.unsaved = True
@@ -76,6 +146,7 @@ def composition_editor_page(composition_id: str):
             ui.label("Composition not found").classes("text-red-400 text-xl p-8")
             ui.button("Back to list", on_click=lambda: ui.navigate.to("/"))
             return
+        _resolve_role_conditions(spec)
         state = EditorState(composition_id, spec)
         _editor_states[composition_id] = state
 
@@ -98,7 +169,15 @@ def composition_editor_page(composition_id: str):
             tab_exec = ui.tab("Execution")
             tab_meta = ui.tab("Metadata")
 
-        with ui.tab_panels(tabs, value=tab_ind).classes("w-full"):
+        tab_map = {
+            "Indicators": tab_ind, "Entry Rules": tab_entry,
+            "Exit Rules": tab_exit, "Gates": tab_gate,
+            "Execution": tab_exec, "Metadata": tab_meta,
+        }
+        initial_tab = tab_map.get(state.active_tab, tab_ind)
+        tabs.on("update:model-value", lambda e: setattr(state, 'active_tab', e.args))
+
+        with ui.tab_panels(tabs, value=initial_tab).classes("w-full"):
             with ui.tab_panel(tab_ind):
                 _render_indicators_tab(state, update_unsaved)
 
@@ -195,8 +274,44 @@ def _toggle_archetype(state: EditorState, tag: str, selected: bool):
     state.mark_changed()
 
 
+def _validate_conditions(spec: dict) -> List[str]:
+    """Pre-check all conditions for validity. Returns list of issues."""
+    issues = []
+    all_conds = []
+    for rule in spec.get("entry_rules", []):
+        for cond in rule.get("conditions", []):
+            all_conds.append(("entry", rule.get("label", "entry"), cond))
+        for grp in rule.get("condition_groups", []):
+            for cond in grp.get("conditions", []):
+                all_conds.append(("entry group", grp.get("label", "group"), cond))
+    for rule in spec.get("exit_rules", []):
+        for cond in rule.get("conditions", []):
+            all_conds.append(("exit", rule.get("label", "exit"), cond))
+    for rule in spec.get("gate_rules", []):
+        for cond in rule.get("conditions", []):
+            all_conds.append(("gate", rule.get("label", "gate"), cond))
+
+    for ctx, rule_label, cond in all_conds:
+        # Skip empty/new conditions
+        if not cond.get("indicator") and not cond.get("output"):
+            continue
+        h = _hydrate_condition(cond, spec)
+        if not h["instance_valid"] and cond.get("indicator"):
+            issues.append(f"{ctx} '{rule_label}': instance '{cond.get('indicator')}' not found")
+        if not h["output_valid"] and cond.get("output") and h["instance_valid"]:
+            issues.append(f"{ctx} '{rule_label}': output '{cond.get('output')}' not available")
+    return issues
+
+
 def _do_compile(state: EditorState):
     """Compile current in-memory spec and re-render compiler panel."""
+    # F3: mandatory pre-check
+    issues = _validate_conditions(state.working_spec)
+    if issues:
+        ui.notify(
+            "Cannot compile: fix or remove invalid conditions (shown with red border)",
+            type="negative", timeout=10000)
+        return
     try:
         result = state.compile()
         hash_val = result["strategy_config_hash"]
@@ -291,8 +406,13 @@ def _render_indicators_tab(state: EditorState, on_change):
 
 async def _add_indicator(state: EditorState, on_change):
     """Open indicator picker and add the result."""
+    existing_labels = [
+        inst.get("label", "") for inst in
+        state.working_spec.get("indicator_instances", [])
+    ]
     result = await show_indicator_picker(
-        state.working_spec.get("target_engine_version", "1.8.0"))
+        state.working_spec.get("target_engine_version", "1.8.0"),
+        existing_labels=existing_labels)
     if result:
         state.working_spec.setdefault("indicator_instances", []).append(result)
         state.mark_changed()
@@ -337,27 +457,27 @@ async def _delete_indicator(state: EditorState, idx, on_change):
 
 
 def _find_indicator_references(spec: dict, label: str) -> List[str]:
-    """Find all rules/conditions that reference an indicator label."""
+    """Find all rules/conditions that reference an indicator label (as indicator or ref_indicator)."""
     refs = []
     for rule in spec.get("entry_rules", []):
         rule_label = rule.get("label", "entry rule")
         for i, cond in enumerate(rule.get("conditions", [])):
-            if cond.get("indicator") == label:
+            if cond.get("indicator") == label or cond.get("ref_indicator") == label:
                 refs.append(f"Entry Rule '{rule_label}' condition {i+1}")
         for grp in rule.get("condition_groups", []):
             grp_label = grp.get("label", "group")
             for i, cond in enumerate(grp.get("conditions", [])):
-                if cond.get("indicator") == label:
+                if cond.get("indicator") == label or cond.get("ref_indicator") == label:
                     refs.append(f"Entry Rule '{rule_label}' / {grp_label} condition {i+1}")
     for rule in spec.get("exit_rules", []):
         rule_label = rule.get("label", "exit rule")
         for i, cond in enumerate(rule.get("conditions", [])):
-            if cond.get("indicator") == label:
+            if cond.get("indicator") == label or cond.get("ref_indicator") == label:
                 refs.append(f"Exit Rule '{rule_label}' condition {i+1}")
     for rule in spec.get("gate_rules", []):
         rule_label = rule.get("label", "gate")
         for i, cond in enumerate(rule.get("conditions", [])):
-            if cond.get("indicator") == label:
+            if cond.get("indicator") == label or cond.get("ref_indicator") == label:
                 refs.append(f"Gate '{rule_label}' condition {i+1}")
     return refs
 
@@ -453,13 +573,13 @@ def _render_entry_direction(state: EditorState, direction: str, on_change):
                     cadence_opts = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d"]
                     if raw_cadence not in cadence_opts:
                         cadence_opts.append(raw_cadence)
-                    cadence = ui.select(
+                    ui.select(
                         cadence_opts,
                         value=raw_cadence,
                         label="Cadence",
+                        on_change=lambda e, i=idx: _update_entry_field(
+                            state, i, "evaluation_cadence", e.value, on_change),
                     ).classes("w-24").props("dense")
-                    cadence.on("update:model-value", lambda e, i=idx: _update_entry_field(
-                        state, i, "evaluation_cadence", e.args, on_change))
 
                     ui.button(icon="delete", on_click=lambda i=idx: _delete_entry_rule(
                         state, i, on_change)).props("flat dense round color=negative")
@@ -475,8 +595,30 @@ def _render_entry_direction(state: EditorState, direction: str, on_change):
                 if groups:
                     for gi, grp in enumerate(groups):
                         with ui.card().classes("w-full ml-4 p-2 mt-1"):
-                            ui.label(f"Group: {grp.get('label', f'Group {gi+1}')}").classes(
-                                "text-sm font-bold")
+                            with ui.row().classes("w-full items-center justify-between"):
+                                grp_name = ui.input(
+                                    value=grp.get("label", f"Group {gi+1}"),
+                                    label="Group name",
+                                ).classes("w-48").props("dense")
+                                grp_name.on("change", lambda e, ridx=idx, gidx=gi: _update_group_label(
+                                    state, ridx, gidx, e.args, on_change))
+
+                                with ui.row().classes("gap-1"):
+                                    if gi > 0:
+                                        ui.button(icon="arrow_upward",
+                                                  on_click=lambda ridx=idx, gidx=gi: _move_group(
+                                                      state, ridx, gidx, -1, on_change)).props(
+                                            "flat dense round size=sm")
+                                    if gi < len(groups) - 1:
+                                        ui.button(icon="arrow_downward",
+                                                  on_click=lambda ridx=idx, gidx=gi: _move_group(
+                                                      state, ridx, gidx, 1, on_change)).props(
+                                            "flat dense round size=sm")
+                                    ui.button(icon="delete",
+                                              on_click=lambda ridx=idx, gidx=gi: _delete_group(
+                                                  state, ridx, gidx, on_change)).props(
+                                        "flat dense round size=sm color=negative")
+
                             render_condition_builder(
                                 state, grp.setdefault("conditions", []),
                                 f"entry_{idx}_grp_{gi}", on_change)
@@ -525,3 +667,36 @@ def _add_condition_group(state, rule_idx, on_change):
         state.mark_changed()
         on_change()
         ui.navigate.to(f"/editor/{state.composition_id}")
+
+
+def _update_group_label(state, rule_idx, group_idx, value, on_change):
+    rules = state.working_spec.get("entry_rules", [])
+    if rule_idx < len(rules):
+        groups = rules[rule_idx].get("condition_groups", [])
+        if group_idx < len(groups):
+            groups[group_idx]["label"] = value
+            state.mark_changed()
+            on_change()
+
+
+def _delete_group(state, rule_idx, group_idx, on_change):
+    rules = state.working_spec.get("entry_rules", [])
+    if rule_idx < len(rules):
+        groups = rules[rule_idx].get("condition_groups", [])
+        if group_idx < len(groups):
+            groups.pop(group_idx)
+            state.mark_changed()
+            on_change()
+            ui.navigate.to(f"/editor/{state.composition_id}")
+
+
+def _move_group(state, rule_idx, group_idx, direction, on_change):
+    rules = state.working_spec.get("entry_rules", [])
+    if rule_idx < len(rules):
+        groups = rules[rule_idx].get("condition_groups", [])
+        new_idx = group_idx + direction
+        if 0 <= new_idx < len(groups):
+            groups[group_idx], groups[new_idx] = groups[new_idx], groups[group_idx]
+            state.mark_changed()
+            on_change()
+            ui.navigate.to(f"/editor/{state.composition_id}")

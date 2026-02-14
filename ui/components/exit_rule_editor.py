@@ -60,25 +60,25 @@ def render_exit_rules(state, on_change: Callable):
                         name_input.on("change", lambda e, idx=i: _update_exit_field(
                             state, idx, "label", e.args, on_change))
 
-                        type_select = ui.select(
+                        ui.select(
                             available_types,
                             value=et,
                             label="Type",
+                            on_change=lambda e, idx=i: _update_exit_field(
+                                state, idx, "exit_type", e.value, on_change),
                         ).classes("w-44").props("dense")
-                        type_select.on("update:model-value", lambda e, idx=i: _update_exit_field(
-                            state, idx, "exit_type", e.args, on_change))
 
                         raw_cadence = rule.get("evaluation_cadence", "1m")
                         cadence_opts = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d"]
                         if raw_cadence not in cadence_opts:
                             cadence_opts.append(raw_cadence)
-                        cadence = ui.select(
+                        ui.select(
                             cadence_opts,
                             value=raw_cadence,
                             label="Cadence",
+                            on_change=lambda e, idx=i: _update_exit_field(
+                                state, idx, "evaluation_cadence", e.value, on_change),
                         ).classes("w-24").props("dense")
-                        cadence.on("update:model-value", lambda e, idx=i: _update_exit_field(
-                            state, idx, "evaluation_cadence", e.args, on_change))
 
                     with ui.row().classes("gap-1"):
                         if i > 0:
@@ -92,6 +92,37 @@ def render_exit_rules(state, on_change: Callable):
                         ui.button(icon="delete",
                                   on_click=lambda idx=i: _delete_exit(state, idx, on_change)).props(
                             "flat dense round size=sm color=negative")
+
+                # applies_to direction checkboxes (H7: default injection does NOT mark dirty)
+                if "applies_to" not in rule:
+                    rule["applies_to"] = ["LONG", "SHORT"]
+                applies_to = rule.get("applies_to", ["LONG", "SHORT"])
+                if not applies_to:
+                    rule["applies_to"] = ["LONG", "SHORT"]
+                    applies_to = rule["applies_to"]
+
+                with ui.row().classes("items-center gap-1 mt-1"):
+                    ui.label("Applies to:").classes("text-xs text-gray-400")
+                    long_cb = ui.checkbox("LONG", value="LONG" in applies_to).props("dense")
+                    short_cb = ui.checkbox("SHORT", value="SHORT" in applies_to).props("dense")
+
+                    def _update_applies_to(e=None, idx=i, lcb=long_cb, scb=short_cb, r=rule):
+                        result = []
+                        if lcb.value:
+                            result.append("LONG")
+                        if scb.value:
+                            result.append("SHORT")
+                        if not result:
+                            lcb.value = True
+                            scb.value = True
+                            result = ["LONG", "SHORT"]
+                            ui.notify("applies_to cannot be empty — reset to both", type="warning")
+                        r["applies_to"] = result
+                        state.mark_changed()
+                        on_change()
+
+                    long_cb.on("update:model-value", _update_applies_to)
+                    short_cb.on("update:model-value", _update_applies_to)
 
                 # Type-specific parameters
                 if et == "STOP_LOSS":
@@ -113,11 +144,12 @@ def _render_stop_loss_params(state, idx, rule, on_change):
     _MODE_ALIASES = {"PERCENT": "FIXED_PERCENT"}
     with ui.row().classes("gap-4 mt-2"):
         raw_mode = rule.get("mode", "FIXED_PERCENT")
-        mode = ui.select(["FIXED_PERCENT", "ATR_MULTIPLE"],
-                         value=_MODE_ALIASES.get(raw_mode, raw_mode),
-                         label="Mode").classes("w-40").props("dense")
-        mode.on("update:model-value", lambda e: _update_exit_field(
-            state, idx, "mode", e.args, on_change))
+        ui.select(["FIXED_PERCENT", "ATR_MULTIPLE"],
+                  value=_MODE_ALIASES.get(raw_mode, raw_mode),
+                  label="Mode",
+                  on_change=lambda e: _update_exit_field(
+                      state, idx, "mode", e.value, on_change),
+                  ).classes("w-40").props("dense")
 
         vl = ui.number(value=rule.get("value_long_bps", 200),
                        label="Long (bps)").classes("w-28").props("dense")
@@ -134,11 +166,12 @@ def _render_trailing_stop_params(state, idx, rule, on_change):
     _MODE_ALIASES = {"PERCENT": "FIXED_PERCENT"}
     with ui.row().classes("gap-4 mt-2"):
         raw_mode = rule.get("mode", "ATR_MULTIPLE")
-        mode = ui.select(["FIXED_PERCENT", "ATR_MULTIPLE"],
-                         value=_MODE_ALIASES.get(raw_mode, raw_mode),
-                         label="Mode").classes("w-40").props("dense")
-        mode.on("update:model-value", lambda e: _update_exit_field(
-            state, idx, "mode", e.args, on_change))
+        ui.select(["FIXED_PERCENT", "ATR_MULTIPLE"],
+                  value=_MODE_ALIASES.get(raw_mode, raw_mode),
+                  label="Mode",
+                  on_change=lambda e: _update_exit_field(
+                      state, idx, "mode", e.value, on_change),
+                  ).classes("w-40").props("dense")
 
         vl = ui.number(value=rule.get("value_long_bps", 300),
                        label="Long (bps)").classes("w-28").props("dense")
@@ -162,11 +195,12 @@ def _render_time_limit_params(state, idx, rule, on_change):
         ref_opts = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d"]
         if raw_ref not in ref_opts:
             ref_opts.append(raw_ref)
-        ref = ui.select(ref_opts,
-                        value=raw_ref,
-                        label="Reference cadence").classes("w-32").props("dense")
-        ref.on("update:model-value", lambda e: _update_exit_field(
-            state, idx, "time_limit_reference_cadence", e.args, on_change))
+        ui.select(ref_opts,
+                  value=raw_ref,
+                  label="Reference cadence",
+                  on_change=lambda e: _update_exit_field(
+                      state, idx, "time_limit_reference_cadence", e.value, on_change),
+                  ).classes("w-32").props("dense")
 
 
 def _render_mtm_params(state, idx, rule, on_change):

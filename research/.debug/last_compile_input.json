@@ -165,7 +165,26 @@
             "value": "0",
             "quantifier": "ALL"
           },
-          "conditions": []
+          "conditions": [
+            {
+              "indicator": "macro_3d",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0.0
+            },
+            {
+              "indicator": "macro_1d",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0.0
+            },
+            {
+              "indicator": "macro_12h",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0.0
+            }
+          ]
         },
         {
           "label": "intra_alignment",
@@ -178,7 +197,26 @@
             "value": "0",
             "quantifier": "ALL"
           },
-          "conditions": []
+          "conditions": [
+            {
+              "indicator": "intra_1h",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0.0
+            },
+            {
+              "indicator": "intra_30m",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0.0
+            },
+            {
+              "indicator": "intra_15m",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0.0
+            }
+          ]
         }
       ],
       "conditions": [
@@ -186,7 +224,8 @@
           "role": "entry_signal",
           "output": "slope_sign",
           "operator": "crosses_below",
-          "value": "0"
+          "value": 0.0,
+          "indicator": "entry_5m"
         }
       ]
     }
@@ -204,7 +243,7 @@
           "indicator": "exit_1d",
           "output": "slope_sign",
           "operator": ">",
-          "value": "0"
+          "value": 0.0
         }
       ]
     }

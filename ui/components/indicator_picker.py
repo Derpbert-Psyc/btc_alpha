@@ -16,9 +16,76 @@ QUICK_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d"]
 ROLES = ["trigger", "filter", "price", "sizing", "gate", "diagnostic"]
 
 
-async def show_indicator_picker(target_engine_version: str = "1.8.0") -> Optional[Dict[str, Any]]:
+# ---------------------------------------------------------------------------
+# Auto-label generation — indicator-specific patterns
+# ---------------------------------------------------------------------------
+
+def _generate_auto_label(name: str, indicator_id: int, tf: str, params: dict) -> str:
+    """Generate auto-label based on indicator-specific patterns."""
+    n = name.lower()
+    if n == "ema":
+        period = params.get("period", 20)
+        if isinstance(period, (int, float)):
+            period = int(period)
+        if period == 1:
+            return f"price_{tf}"
+        return f"ema_{tf}_p{period}"
+    if n == "rsi":
+        return f"rsi_{tf}_p{params.get('period', 14)}"
+    if n == "atr":
+        return f"atr_{tf}_p{params.get('period', 14)}"
+    if n in ("macd", "macd_tv"):
+        return f"macd_{tf}"
+    if n == "bollinger":
+        return f"boll_{tf}_p{params.get('period', 20)}"
+    if n == "donchian":
+        return f"dc_{tf}_p{params.get('period', 20)}"
+    if n == "adx":
+        return f"adx_{tf}_p{params.get('period', 14)}"
+    if n == "choppiness":
+        return f"chop_{tf}_p{params.get('period', 14)}"
+    if n == "linreg":
+        return f"linreg_{tf}_p{params.get('period', 14)}"
+    if n == "hv":
+        return f"hv_{tf}_p{params.get('period', 20)}"
+    if n == "roc":
+        return f"roc_{tf}_p{params.get('period', 14)}"
+    if n == "pivot_structure":
+        return f"pivot_{tf}"
+    if n == "floor_pivots":
+        return f"fpivot_{tf}"
+    if n == "dynamic_sr":
+        return f"dsr_{tf}"
+    if n == "vol_targeting":
+        return f"voltgt_{tf}"
+    if n == "vrvp":
+        return f"vrvp_{tf}"
+    # All others: {name}_{tf}
+    return f"{n}_{tf}"
+
+
+def _unique_label(base: str, existing_labels: list) -> str:
+    """Generate unique label with collision avoidance."""
+    if base not in existing_labels:
+        return base
+    suffix = 2
+    while f"{base}_{suffix}" in existing_labels:
+        suffix += 1
+    return f"{base}_{suffix}"
+
+
+# ---------------------------------------------------------------------------
+# Picker dialog
+# ---------------------------------------------------------------------------
+
+async def show_indicator_picker(
+    target_engine_version: str = "1.8.0",
+    existing_labels: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
     """Show indicator picker modal. Returns configured instance dict or None."""
     result = {"value": None}
+    if existing_labels is None:
+        existing_labels = []
 
     with ui.dialog() as dialog, ui.card().classes("w-[800px] max-w-[90vw]"):
         ui.label("Add Indicator Instance").classes("text-xl font-bold mb-4")
@@ -47,7 +114,7 @@ async def show_indicator_picker(target_engine_version: str = "1.8.0") -> Optiona
                                 f"{name} ({iid})",
                                 on_click=lambda iid=iid: _select_indicator(
                                     iid, config_container, selected_id, result,
-                                    dialog, target_engine_version),
+                                    dialog, target_engine_version, existing_labels),
                             ).props("flat dense")
                             with btn:
                                 ui.tooltip(", ".join(outputs.keys()))
@@ -58,7 +125,7 @@ async def show_indicator_picker(target_engine_version: str = "1.8.0") -> Optiona
 
 
 def _select_indicator(indicator_id, container, selected_id, result, dialog,
-                      target_engine_version):
+                      target_engine_version, existing_labels):
     """Configure the selected indicator."""
     selected_id["value"] = indicator_id
     name = INDICATOR_ID_TO_NAME.get(indicator_id, f"id_{indicator_id}")
@@ -69,14 +136,29 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
         ui.separator()
         ui.label(f"Configure: {name}").classes("text-lg font-bold")
 
-        # Label — auto-generates from {name}_{timeframe}
+        # Label — auto-generates with indicator-specific pattern
         label_manually_set = {"value": False}
-        default_label = f"{name}_15m"
-        label_input = ui.input(value=default_label, label="Instance Label").classes("w-full")
+        default_params = _get_default_params(indicator_id)
+        initial_label = _unique_label(
+            _generate_auto_label(name, indicator_id, "15m", default_params),
+            existing_labels,
+        )
+        label_input = ui.input(value=initial_label, label="Instance Label").classes("w-full")
+        label_error = ui.label("").classes("text-xs text-red-400")
 
         def _on_label_manual_edit(e):
             label_manually_set["value"] = True
+            _validate_label()
         label_input.on("change", _on_label_manual_edit)
+
+        def _validate_label():
+            val = label_input.value.strip()
+            if val in existing_labels:
+                label_error.text = "Label already exists"
+                add_btn.props("disable")
+            else:
+                label_error.text = ""
+                add_btn.props(remove="disable")
 
         # Timeframe — dual mode
         with ui.row().classes("w-full items-center gap-2"):
@@ -90,7 +172,9 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
             custom_unit = ui.select(["min", "hr", "day", "wk"], value="min").classes("w-20")
 
         def toggle_tf(e):
-            if e.args == "Custom":
+            # Read from element .value (mapped by NiceGUI), not raw e.args
+            mode = tf_mode.value
+            if mode == "Custom":
                 quick_tf.style("display: none")
                 custom_row.style("")
             else:
@@ -121,44 +205,47 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
         # Parameters
         ui.label("Parameters:").classes("text-sm text-gray-400 mt-2")
         param_inputs = {}
-        default_params = _get_default_params(indicator_id)
         for pname, pval in default_params.items():
             inp = ui.number(value=pval, label=pname).classes("w-32")
             param_inputs[pname] = inp
 
-        # Auto-label generation: {name}_{tf}, or price_{tf} for EMA period=1
+        # Auto-label generation
         def _get_current_tf():
             if tf_mode.value == "Quick":
                 return quick_tf.value
             return f"{int(custom_val.value)}{custom_unit.value}"
 
+        def _get_current_params():
+            return {k: v.value for k, v in param_inputs.items()}
+
         def _update_auto_label(_=None):
             if label_manually_set["value"]:
                 return
             tf = _get_current_tf()
-            # Special case: EMA with period=1 → price_{tf}
-            if indicator_id == 1 and "period" in param_inputs:
-                if param_inputs["period"].value == 1:
-                    label_input.value = f"price_{tf}"
-                    return
-            label_input.value = f"{name}_{tf}"
+            params = _get_current_params()
+            base = _generate_auto_label(name, indicator_id, tf, params)
+            label_input.value = _unique_label(base, existing_labels)
+            label_error.text = ""
 
         # Wire auto-label to timeframe and parameter changes
         quick_tf.on("update:model-value", _update_auto_label)
         custom_val.on("change", _update_auto_label)
         custom_unit.on("update:model-value", _update_auto_label)
-        if indicator_id == 1 and "period" in param_inputs:
-            param_inputs["period"].on("change", _update_auto_label)
+        for pname, inp in param_inputs.items():
+            inp.on("change", _update_auto_label)
 
         # Confirm / Cancel
         with ui.row().classes("w-full justify-end gap-2 mt-4"):
             ui.button("Cancel", on_click=dialog.close).props("flat")
 
             def confirm():
+                if label_input.value.strip() in existing_labels:
+                    label_error.text = "Label already exists"
+                    return
                 tf = quick_tf.value if tf_mode.value == "Quick" else f"{int(custom_val.value)}{custom_unit.value}"
                 params = {k: v.value for k, v in param_inputs.items()}
                 instance = {
-                    "label": label_input.value,
+                    "label": label_input.value.strip(),
                     "indicator_id": name,
                     "timeframe": tf,
                     "parameters": params,
@@ -169,7 +256,7 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
                 result["value"] = instance
                 dialog.submit(instance)
 
-            ui.button("Add", on_click=confirm).props("color=primary")
+            add_btn = ui.button("Add", on_click=confirm).props("color=primary")
 
 
 def _get_default_params(indicator_id: int) -> dict:

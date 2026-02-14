@@ -71,22 +71,30 @@ body {
 }
 /* Form inputs */
 .q-field__control {
+    background-color: var(--border) !important;
     color: var(--text) !important;
 }
 .q-field__label { color: var(--text-dim) !important; }
 .q-field--focused .q-field__label { color: var(--blue) !important; }
 .q-field__bottom { color: var(--text-dim) !important; }
+/* Dropdown menus */
+.q-menu { background-color: var(--border); }
+.q-item { color: var(--text); }
+.q-item:hover { background-color: var(--bg-surface) !important; }
 /* Tabs */
 .q-tabs { border-bottom: 1px solid var(--border) !important; }
 .q-tab { color: var(--text-dim) !important; text-transform: none !important; }
 .q-tab--active { color: var(--blue) !important; }
-.q-tab-panel { padding: 16px 0 !important; }
+.q-tab-panel { padding: 16px 0 !important; background-color: transparent !important; }
 /* Buttons */
 .q-btn[class*="bg-primary"] { background: var(--blue) !important; }
 .q-btn[class*="bg-positive"] { background: var(--green) !important; }
 .q-btn[class*="bg-warning"] { background: var(--amber) !important; color: #0a0f1a !important; }
 .q-btn[class*="bg-negative"] { background: var(--red) !important; }
 .q-btn[class*="bg-secondary"] { background: var(--purple) !important; }
+.q-btn--disabled { opacity: 0.35 !important; }
+/* Toggle buttons */
+.q-btn-toggle { border: 1px solid var(--border); border-radius: 4px; }
 /* Badges */
 .q-badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
 /* Expansion panels */

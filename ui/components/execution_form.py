@@ -22,12 +22,12 @@ def render_execution_form(state, on_change: Callable):
             _dir_val = _dir_norm.get(_dir_val, _dir_val)
             if _dir_val not in _dir_options:
                 _dir_val = "BOTH"
-            direction = ui.select(
+            ui.select(
                 _dir_options,
                 value=_dir_val,
                 label="Direction",
+                on_change=lambda e: _update(state, ep, "direction", e.value, on_change),
             ).classes("w-40").props("dense")
-            direction.on("update:model-value", lambda e: _update(state, ep, "direction", e.args, on_change))
 
             leverage = ui.number(
                 value=ep.get("leverage", 1),
@@ -36,12 +36,12 @@ def render_execution_form(state, on_change: Callable):
             ).classes("w-24").props("dense")
             leverage.on("change", lambda e: _update(state, ep, "leverage", int(e.args), on_change))
 
-            sizing = ui.select(
+            ui.select(
                 ["RISK_FRACTION", "FIXED_QTY", "FIXED_NOTIONAL"],
                 value=ep.get("sizing_mode", "RISK_FRACTION"),
                 label="Sizing Mode",
+                on_change=lambda e: _update(state, ep, "sizing_mode", e.value, on_change),
             ).classes("w-44").props("dense")
-            sizing.on("update:model-value", lambda e: _update(state, ep, "sizing_mode", e.args, on_change))
 
             risk_frac = ui.number(
                 value=ep.get("risk_fraction_bps", 100),
@@ -72,12 +72,12 @@ def render_execution_form(state, on_change: Callable):
             ).classes("w-32").props("dense")
             fm_interval.on("change", lambda e: _update_fm(state, ep, "interval_hours", int(e.args), on_change))
 
-            fm_source = ui.select(
+            ui.select(
                 ["FIXED", "LIVE"],
                 value=fm.get("rate_source", "FIXED"),
                 label="Rate Source",
+                on_change=lambda e: _update_fm(state, ep, "rate_source", e.value, on_change),
             ).classes("w-28").props("dense")
-            fm_source.on("update:model-value", lambda e: _update_fm(state, ep, "rate_source", e.args, on_change))
 
             fm_rate = ui.number(
                 value=fm.get("rate_per_interval_bps", 1),

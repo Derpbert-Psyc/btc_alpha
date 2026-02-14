@@ -122,7 +122,14 @@ def list_compositions() -> List[Dict[str, Any]]:
 
 
 def delete_composition(composition_id: str) -> None:
-    """Remove a composition from index (does not delete files)."""
+    """Remove a composition from index AND delete files from disk."""
+    import shutil
+    comp_dir = _composition_dir(composition_id)
+    try:
+        if os.path.exists(comp_dir):
+            shutil.rmtree(comp_dir)
+    except OSError as e:
+        print(f"Warning: could not remove {comp_dir}: {e}")
     index = load_index()
     index["compositions"].pop(composition_id, None)
     save_index(index)
