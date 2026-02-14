@@ -141,14 +141,14 @@
     ],
     "entry_rules": [
       {
-        "name": "short_entry",
-        "direction": "SHORT",
+        "name": "long_entry",
+        "direction": "LONG",
         "evaluation_cadence": "5m",
         "conditions": [
           {
             "indicator": "entry_5m",
             "output": "slope_sign",
-            "operator": "crosses_below",
+            "operator": "crosses_above",
             "value": 0.0,
             "ref_indicator": null,
             "ref_output": null
@@ -161,7 +161,7 @@
               {
                 "indicator": "macro_12h",
                 "output": "slope_sign",
-                "operator": "<",
+                "operator": ">",
                 "value": "0",
                 "ref_indicator": null,
                 "ref_output": null
@@ -169,7 +169,7 @@
               {
                 "indicator": "macro_1d",
                 "output": "slope_sign",
-                "operator": "<",
+                "operator": ">",
                 "value": "0",
                 "ref_indicator": null,
                 "ref_output": null
@@ -177,7 +177,7 @@
               {
                 "indicator": "macro_3d",
                 "output": "slope_sign",
-                "operator": "<",
+                "operator": ">",
                 "value": "0",
                 "ref_indicator": null,
                 "ref_output": null
@@ -190,7 +190,7 @@
               {
                 "indicator": "intra_15m",
                 "output": "slope_sign",
-                "operator": "<",
+                "operator": ">",
                 "value": "0",
                 "ref_indicator": null,
                 "ref_output": null
@@ -198,7 +198,7 @@
               {
                 "indicator": "intra_1h",
                 "output": "slope_sign",
-                "operator": "<",
+                "operator": ">",
                 "value": "0",
                 "ref_indicator": null,
                 "ref_output": null
@@ -206,8 +206,83 @@
               {
                 "indicator": "intra_30m",
                 "output": "slope_sign",
-                "operator": "<",
+                "operator": ">",
                 "value": "0",
+                "ref_indicator": null,
+                "ref_output": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "SHORT Entry",
+        "direction": "SHORT",
+        "evaluation_cadence": "15m",
+        "conditions": [
+          {
+            "indicator": "entry_5m",
+            "output": "slope_sign",
+            "operator": "crosses_below",
+            "value": 0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "condition_groups": [
+          {
+            "name": "macroalignment",
+            "conditions": [
+              {
+                "indicator": "macro_3d",
+                "output": "slope_sign",
+                "operator": "<",
+                "value": 0,
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "macro_1d",
+                "output": "slope_sign",
+                "operator": "<",
+                "value": 0,
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "macro_12h",
+                "output": "slope_sign",
+                "operator": "<",
+                "value": 0,
+                "ref_indicator": null,
+                "ref_output": null
+              }
+            ]
+          },
+          {
+            "name": "intra_alignment",
+            "conditions": [
+              {
+                "indicator": "intra_1h",
+                "output": "slope_sign",
+                "operator": "<",
+                "value": 0,
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "intra_30m",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": 0,
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "intra_15m",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": 0,
                 "ref_indicator": null,
                 "ref_output": null
               }
@@ -217,6 +292,25 @@
       }
     ],
     "exit_rules": [
+      {
+        "name": "long_signal_exit",
+        "type": "SIGNAL",
+        "applies_to": [
+          "LONG"
+        ],
+        "evaluation_cadence": "1d",
+        "conditions": [
+          {
+            "indicator": "exit_1d",
+            "output": "slope_sign",
+            "operator": "<",
+            "value": 0.0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "parameters": {}
+      },
       {
         "name": "short_signal_exit",
         "type": "SIGNAL",
@@ -229,7 +323,7 @@
             "indicator": "exit_1d",
             "output": "slope_sign",
             "operator": ">",
-            "value": 0.0,
+            "value": 0,
             "ref_indicator": null,
             "ref_output": null
           }
@@ -243,7 +337,7 @@
       "trend_following"
     ],
     "execution_params": {
-      "direction": "SHORT",
+      "direction": "BOTH",
       "leverage": 1.0,
       "position_sizing": {
         "mode": "RISK_FRACTION",
@@ -268,13 +362,13 @@
     },
     "engine_version": "1.8.0"
   },
-  "strategy_config_hash": "sha256:54d2c27ded4e22c26778c1d51f4b4a657f8b0aac1a059da3188e147547c479ab",
+  "strategy_config_hash": "sha256:d1a6731b979ff2f0fb7df7ca629d34e20e5aa1b15a2b6cf17b043d87579bd686",
   "lowering_report": {
     "composition_id": "",
     "composition_version": "1.0.0",
-    "composition_spec_hash": "sha256:6e728266b77390e5884d1324e934973d18067ee7e523a9e5b54d47079f7576d7",
-    "strategy_config_hash": "sha256:54d2c27ded4e22c26778c1d51f4b4a657f8b0aac1a059da3188e147547c479ab",
-    "timestamp": "2026-02-14T03:10:05.555465+00:00",
+    "composition_spec_hash": "sha256:3257e1e124c906722ef354d2e216840037301b247db1e57ecd39f099443a91d1",
+    "strategy_config_hash": "sha256:d1a6731b979ff2f0fb7df7ca629d34e20e5aa1b15a2b6cf17b043d87579bd686",
+    "timestamp": "2026-02-14T12:35:42.781265+00:00",
     "compiler_version": "1.0.0",
     "lowering_pipeline_version": "1.0.0",
     "capability_registry_version": "1.0.0",
@@ -330,6 +424,6 @@
       "dominating_instance": "macro_3d"
     }
   },
-  "lowering_report_semantic_hash": "sha256:737e96e69a9999b92840a6508796fab93a912de6bcc7b3825369fec1560d8ed3",
-  "lowering_report_full_hash": "sha256:5fdd2a994b2bf818db81492c96e26890cc469e0fcab552dfa56aba0da2d1d87f"
+  "lowering_report_semantic_hash": "sha256:01236f9c422504d89c899020ffc5b53ba78777e5d416b38cc3e0738b0a4a72e9",
+  "lowering_report_full_hash": "sha256:6bc3a4a9d9bc4ae1ef747314b1ff0a122cf43ac1ddf5d6302685bd29df917fb3"
 }

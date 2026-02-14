@@ -1,5 +1,5 @@
 {
-  "display_name": "MACD Confluence Long",
+  "display_name": "MACD Confluence Bull & Bear",
   "description": "Long-only multi-timeframe MACD alignment. Enter long when 5m momentum inflects upward in direction of 6-TF trend consensus. Exit on daily MACD slope reversal. Fast in, slow out.",
   "archetype_tags": [
     "trend_following",
@@ -164,7 +164,27 @@
             "operator": ">",
             "value": "0",
             "quantifier": "ALL"
-          }
+          },
+          "conditions": [
+            {
+              "indicator": "macro_3d",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0.0
+            },
+            {
+              "indicator": "macro_1d",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0.0
+            },
+            {
+              "indicator": "macro_12h",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0.0
+            }
+          ]
         },
         {
           "label": "intra_alignment",
@@ -176,7 +196,27 @@
             "operator": ">",
             "value": "0",
             "quantifier": "ALL"
-          }
+          },
+          "conditions": [
+            {
+              "indicator": "intra_1h",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0.0
+            },
+            {
+              "indicator": "intra_30m",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0.0
+            },
+            {
+              "indicator": "intra_15m",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0.0
+            }
+          ]
         }
       ],
       "conditions": [
@@ -184,7 +224,69 @@
           "role": "entry_signal",
           "output": "slope_sign",
           "operator": "crosses_above",
-          "value": "0"
+          "value": 0.0,
+          "indicator": "entry_5m"
+        }
+      ]
+    },
+    {
+      "label": "SHORT Entry",
+      "direction": "SHORT",
+      "evaluation_cadence": "15m",
+      "conditions": [
+        {
+          "indicator": "entry_5m",
+          "output": "slope_sign",
+          "operator": "crosses_below",
+          "value": 0
+        }
+      ],
+      "condition_groups": [
+        {
+          "label": "macroalignment",
+          "conditions": [
+            {
+              "indicator": "macro_3d",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0
+            },
+            {
+              "indicator": "macro_1d",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0
+            },
+            {
+              "indicator": "macro_12h",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "label": "intra_alignment",
+          "conditions": [
+            {
+              "indicator": "intra_1h",
+              "output": "slope_sign",
+              "operator": "<",
+              "value": 0
+            },
+            {
+              "indicator": "intra_30m",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0
+            },
+            {
+              "indicator": "intra_15m",
+              "output": "slope_sign",
+              "operator": ">",
+              "value": 0
+            }
+          ]
         }
       ]
     }
@@ -202,24 +304,41 @@
           "indicator": "exit_1d",
           "output": "slope_sign",
           "operator": "<",
-          "value": "0"
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "label": "short_signal_exit",
+      "exit_type": "SIGNAL",
+      "applies_to": [
+        "SHORT"
+      ],
+      "evaluation_cadence": "1d",
+      "conditions": [
+        {
+          "indicator": "exit_1d",
+          "output": "slope_sign",
+          "operator": ">",
+          "value": 0
         }
       ]
     }
   ],
   "gate_rules": [],
   "execution_params": {
-    "direction": "LONG",
+    "direction": "BOTH",
     "leverage": 1.0,
     "position_sizing": {
       "mode": "RISK_FRACTION",
       "risk_fraction_bps": 10000
     },
-    "flip_enabled": false
+    "flip_enabled": false,
+    "funding_model": {}
   },
   "metadata": {
     "spec_version": "1.5.2",
-    "thesis": "Long-only: enter when short-term momentum inflects upward in direction of multi-TF trend alignment. Exit when daily-TF shows momentum reversal. Fast in, slow out.",
+    "thesis": "Single-pod trend harvester deploying capital into whichever direction the full timeframe stack confirms. Entry gate requires unanimous 6-TF agreement (3d, 1d, 12h, 1h, 30m, 15m) plus 5m trigger inflection. Exit is asymmetrically slow (1d cadence). LONG and SHORT paths are structurally mutually exclusive — no overlap possible. Merged from separate Long and Short compositions to consolidate capital into one pod. 311 trades across 2018–2026, Tier S, all 6 triage tests PASS. Single-pod trend harvester deploying capital into whichever direction the full timeframe stack confirms. Entry gate requires unanimous 6-TF agreement (3d, 1d, 12h, 1h, 30m, 15m) plus 5m trigger inflection. Exit is asymmetrically slow (1d cadence). LONG and SHORT paths are structurally mutually exclusive — no overlap possible. Merged from separate Long and Short compositions to consolidate capital into one pod. 311 trades across 2018–2026, Tier S, all 6 triage tests PASS.",
     "known_risks": [
       "81-day warmup from 3D MACD — first 81 days produce no trades",
       "Inactive in low-volatility sideways markets (zero slope on any TF blocks entry)",
@@ -246,11 +365,10 @@
       "multi_tf",
       "long_only"
     ],
-    "forked_from": null,
-    "archive_reason": null,
-    "created": "2026-02-13T08:29:50.175554+00:00",
-    "updated_at": "2026-02-13T08:29:50.175554+00:00"
+    "forked_from": "146afe24-7e03-4109-a6eb-40f7d20e5e32",
+    "created": "2026-02-14T12:29:41.404246+00:00",
+    "updated_at": "2026-02-14T12:43:26.811376+00:00"
   },
-  "composition_id": "146afe24-7e03-4109-a6eb-40f7d20e5e32",
+  "composition_id": "e9163f2e-95d7-4668-8387-70ed258b9144",
   "spec_version": "1.5.2"
 }

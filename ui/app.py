@@ -127,6 +127,8 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #334155; }
+/* Firefox scrollbar */
+* { scrollbar-color: var(--border) var(--bg-primary); scrollbar-width: thin; }
 /* C1: Rounded corners */
 .q-field__control { border-radius: 8px !important; }
 .q-btn { border-radius: 8px !important; }
@@ -164,48 +166,97 @@ body {
 .tier-badge-s { background: linear-gradient(135deg, #7c3aed, #a855f7) !important; color: white !important; border: 1px solid #a855f7; font-weight: 700; }
 .tier-badge-a { background: linear-gradient(135deg, #059669, #10b981) !important; color: white !important; border: 1px solid #10b981; font-weight: 700; }
 .tier-badge-b { background: linear-gradient(135deg, #2563eb, #3b82f6) !important; color: white !important; border: 1px solid #3b82f6; font-weight: 700; }
+/* Frozen first column in strategy list */
+.strategy-table .q-table__container { overflow-x: auto; }
+.strategy-table thead th:first-child,
+.strategy-table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 280px;
+    background-color: var(--bg-panel) !important;
+}
+.strategy-table tbody tr:nth-child(even) td:first-child {
+    background-color: var(--bg-surface) !important;
+}
+.strategy-table tbody tr:hover td:first-child {
+    background-color: rgba(59, 130, 246, 0.08) !important;
+}
+.strategy-table thead th:first-child {
+    z-index: 3;
+    background-color: var(--bg-panel) !important;
+}
+.strategy-table thead th:first-child::after,
+.strategy-table tbody td:first-child::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -8px;
+    width: 8px;
+    height: 100%;
+    background: linear-gradient(to right, rgba(0,0,0,0.3), transparent);
+    pointer-events: none;
+}
 """
+
+
+WORKSPACE_TINTS = {
+    "research": "#0b1528",
+    "shadow": "#1a0a2e",
+    "live": "#0a1f18",
+}
+
+
+def _inject_workspace_css(workspace: str):
+    """Inject DARK_CSS plus workspace-specific background tint."""
+    tint = WORKSPACE_TINTS.get(workspace, WORKSPACE_TINTS["research"])
+    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    ui.add_head_html(f"""<style>
+        :root {{ --bg-primary: {tint}; }}
+        body {{ background-color: {tint} !important; }}
+        .nicegui-content {{ background-color: {tint} !important; }}
+    </style>""")
 
 
 @ui.page("/")
 def index():
-    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    _inject_workspace_css("research")
     strategy_list_page()
 
 
 @ui.page("/editor/{composition_id}")
 def editor(composition_id: str):
-    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    _inject_workspace_css("research")
     composition_editor_page(composition_id)
 
 
 @ui.page("/presets")
 def presets():
-    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    _inject_workspace_css("research")
     preset_library_page()
 
 
 @ui.page("/triage/{strategy_hash}")
 def triage(strategy_hash: str):
-    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    _inject_workspace_css("research")
     triage_results_page(strategy_hash)
 
 
 @ui.page("/shadow")
 def shadow():
-    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    _inject_workspace_css("shadow")
     shadow_workspace_page()
 
 
 @ui.page("/live")
 def live():
-    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    _inject_workspace_css("live")
     live_workspace_page()
 
 
 @ui.page("/sweep/{composition_id}")
 def sweep(composition_id: str):
-    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    _inject_workspace_css("research")
     parameter_sweep_page(composition_id)
 
 

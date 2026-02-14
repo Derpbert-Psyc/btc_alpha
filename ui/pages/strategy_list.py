@@ -166,7 +166,7 @@ def strategy_list_page():
                     columns=columns,
                     rows=rows,
                     row_key="composition_id",
-                ).classes("w-full").props("flat bordered dense")
+                ).classes("w-full strategy-table").props("flat bordered dense")
 
                 # Archetype tags as chips
                 table.add_slot("body-cell-archetype_tags", """
