@@ -1,0 +1,335 @@
+{
+  "resolved_artifact": {
+    "indicator_instances": [
+      {
+        "label": "entry_5m",
+        "indicator_id": 7,
+        "timeframe": "5m",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "macd_line",
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "exit_1d",
+        "indicator_id": 7,
+        "timeframe": "1d",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "intra_15m",
+        "indicator_id": 7,
+        "timeframe": "15m",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "intra_1h",
+        "indicator_id": 7,
+        "timeframe": "1h",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "intra_30m",
+        "indicator_id": 7,
+        "timeframe": "30m",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "macro_12h",
+        "indicator_id": 7,
+        "timeframe": "12h",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "macro_1d",
+        "indicator_id": 7,
+        "timeframe": "1d",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "macro_3d",
+        "indicator_id": 7,
+        "timeframe": "3d",
+        "parameters": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "outputs_used": [
+          "slope_sign"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      }
+    ],
+    "entry_rules": [
+      {
+        "name": "long_entry",
+        "direction": "LONG",
+        "evaluation_cadence": "5m",
+        "conditions": [
+          {
+            "indicator": "entry_5m",
+            "output": "slope_sign",
+            "operator": "crosses_above",
+            "value": 0.0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "condition_groups": [
+          {
+            "name": "macro_alignment",
+            "conditions": [
+              {
+                "indicator": "macro_12h",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": "0",
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "macro_1d",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": "0",
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "macro_3d",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": "0",
+                "ref_indicator": null,
+                "ref_output": null
+              }
+            ]
+          },
+          {
+            "name": "intra_alignment",
+            "conditions": [
+              {
+                "indicator": "intra_15m",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": "0",
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "intra_1h",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": "0",
+                "ref_indicator": null,
+                "ref_output": null
+              },
+              {
+                "indicator": "intra_30m",
+                "output": "slope_sign",
+                "operator": ">",
+                "value": "0",
+                "ref_indicator": null,
+                "ref_output": null
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "exit_rules": [
+      {
+        "name": "long_signal_exit",
+        "type": "SIGNAL",
+        "applies_to": [
+          "LONG"
+        ],
+        "evaluation_cadence": "1d",
+        "conditions": [
+          {
+            "indicator": "exit_1d",
+            "output": "slope_sign",
+            "operator": "<",
+            "value": 0.0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "parameters": {}
+      }
+    ],
+    "gate_rules": [],
+    "archetype_tags": [
+      "multi_timeframe",
+      "trend_following"
+    ],
+    "execution_params": {
+      "direction": "LONG",
+      "leverage": 1.0,
+      "position_sizing": {
+        "mode": "RISK_FRACTION",
+        "risk_fraction_bps": 10000
+      },
+      "flip_enabled": false,
+      "funding_model": {},
+      "stop_loss": null,
+      "entry_type": "MARKET",
+      "take_profit": null,
+      "trailing_stop": null,
+      "time_limit_bars": null,
+      "time_limit_reference_cadence": null,
+      "time_limit_allows_flip": false,
+      "scale_in": null,
+      "trade_rate_limit": null,
+      "slippage_budget": null,
+      "warmup_restart_policy": null,
+      "mtm_drawdown_exit": null,
+      "strict_entry_paths": null,
+      "strict_exit_paths": null
+    },
+    "engine_version": "1.8.0"
+  },
+  "strategy_config_hash": "sha256:7ef63b7adb89948d35e866fc705d92a729287342af5df40e83bb15f73376a7ff",
+  "lowering_report": {
+    "composition_id": "",
+    "composition_version": "1.0.0",
+    "composition_spec_hash": "sha256:2d86465b36da54c32a44a151810e79ba376c87891fe641499aa7b1efac608e71",
+    "strategy_config_hash": "sha256:7ef63b7adb89948d35e866fc705d92a729287342af5df40e83bb15f73376a7ff",
+    "timestamp": "2026-02-14T03:09:38.815502+00:00",
+    "compiler_version": "1.0.0",
+    "lowering_pipeline_version": "1.0.0",
+    "capability_registry_version": "1.0.0",
+    "capability_registry_hash": "sha256:1b32ed118b61b388e64369d64d8aa7b669d7320ad3f39df451c457599a867e95",
+    "framework_schema_version": "1.8.0",
+    "framework_schema_hash": "sha256:daf558845dc28f9923e5bc0826e10a45525731d5268cdf5b9fba1bbc329a5c03",
+    "transformations": [
+      {
+        "step": "role_expansion",
+        "role": "filter/macro",
+        "instances_matched": [
+          "macro_12h",
+          "macro_1d",
+          "macro_3d"
+        ]
+      },
+      {
+        "step": "role_expansion",
+        "role": "filter/intra",
+        "instances_matched": [
+          "intra_15m",
+          "intra_1h",
+          "intra_30m"
+        ]
+      },
+      {
+        "step": "role_expansion",
+        "role": "entry_signal",
+        "resolved_to": "entry_5m"
+      },
+      {
+        "step": "field_stripped",
+        "fields": [
+          "composition_id",
+          "description",
+          "display_name",
+          "group",
+          "metadata",
+          "min_engine_version",
+          "role",
+          "target_engine_version",
+          "target_instrument",
+          "target_variant",
+          "version"
+        ]
+      }
+    ],
+    "warnings": [],
+    "effective_warmup": {
+      "bars": 27,
+      "timeframe": "3d",
+      "duration_days": 81.0,
+      "dominating_instance": "macro_3d"
+    }
+  },
+  "lowering_report_semantic_hash": "sha256:5af2c80d18a845df5ad06826083e2023bd89e933500fbddf3fd0bab021ea82ee",
+  "lowering_report_full_hash": "sha256:11cf986108cf14ad029ace6c5b8249281f2f162988f06240a813b1fdad8a595d"
+}

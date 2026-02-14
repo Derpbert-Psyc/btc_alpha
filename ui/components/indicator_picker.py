@@ -190,7 +190,8 @@ def _select_indicator(indicator_id, container, selected_id, result, dialog,
         with custom_row:
             custom_val = ui.number(value=15, min=1, label="Value").classes("w-20")
             custom_unit = ui.select(
-                ["min", "hr", "day", "wk"], value="min",
+                ["m", "h", "d"], value="m",
+                label="Unit",
                 on_change=lambda e: _update_auto_label(),
             ).classes("w-20")
 

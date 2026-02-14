@@ -17,6 +17,7 @@ from ui.services.composition_store import (
     load_index,
 )
 from ui.services.promotion_reader import derive_lifecycle_state, derive_binding_state, get_best_triage_tier
+from ui.components.workspace_nav import render_workspace_nav
 from ui.pages.composition_editor import _editor_states
 
 LIFECYCLE_ORDER = {
@@ -86,9 +87,11 @@ def _build_row(entry: Dict[str, Any]) -> Dict[str, Any]:
 def strategy_list_page():
     """Render the strategy list home screen."""
     with ui.column().classes("w-full max-w-7xl mx-auto p-4"):
+        render_workspace_nav("research")
+
         # Header
         with ui.row().classes("w-full items-center justify-between mb-4"):
-            ui.label("BTC Alpha Research Panel").classes(
+            ui.label("Research Lab").classes(
                 "text-2xl font-bold")
             with ui.row().classes("gap-2"):
                 ui.button("New Composition", on_click=_new_composition).props(

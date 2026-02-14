@@ -171,7 +171,7 @@
   ],
   "exit_rules": [
     {
-      "label": "New Exit",
+      "label": "MACD Slope turn",
       "exit_type": "SIGNAL",
       "applies_to": [
         "LONG"
@@ -185,6 +185,16 @@
           "value": 0
         }
       ]
+    },
+    {
+      "label": "8x ATR",
+      "exit_type": "SIGNAL",
+      "applies_to": [
+        "LONG",
+        "SHORT"
+      ],
+      "evaluation_cadence": "1m",
+      "conditions": []
     }
   ],
   "gate_rules": [],
@@ -202,7 +212,7 @@
     "spec_version": "1.5.2",
     "thesis": "Long-only: enter when short-term momentum inflects upward in direction of multi-TF trend alignment. Exit when daily-TF shows momentum reversal. Fast in, slow out.",
     "known_risks": [
-      "81-day warmup from 3D MACD \u2014 first 81 days produce no trades",
+      "81-day warmup from 3D MACD — first 81 days produce no trades",
       "Inactive in low-volatility sideways markets (zero slope on any TF blocks entry)",
       "1D exit cadence means exits can be delayed up to 24h after reversal signal"
     ],
@@ -229,7 +239,7 @@
     ],
     "forked_from": "146afe24-7e03-4109-a6eb-40f7d20e5e32",
     "created": "2026-02-14T03:39:44.555165+00:00",
-    "updated_at": "2026-02-14T03:43:40.994144+00:00"
+    "updated_at": "2026-02-14T03:50:37.188059+00:00"
   },
   "composition_id": "0abc71f6-6868-4840-991d-2f95922d229d",
   "spec_version": "1.5.2"

@@ -197,3 +197,46 @@ def derive_binding_state(
             continue
 
     return "current"
+
+
+def demote_lifecycle(latest_compiled_hash: str, demote_from: str) -> int:
+    """Demote a strategy by disabling promotion artifacts with the given tier.
+
+    Renames matching .json files to .json.demoted to preserve audit trail.
+    Since derive_lifecycle_state() only reads .json files, the lifecycle
+    automatically falls back to the next highest tier.
+
+    Args:
+        latest_compiled_hash: The strategy config hash.
+        demote_from: Tier to demote from ('SHADOW_VALIDATED' or 'LIVE_APPROVED').
+
+    Returns:
+        Number of artifacts demoted.
+    """
+    valid_demotions = {"SHADOW_VALIDATED", "LIVE_APPROVED"}
+    if demote_from not in valid_demotions:
+        raise ValueError(f"Invalid demotion tier: {demote_from}")
+
+    hash_val = latest_compiled_hash
+    if hash_val.startswith("sha256:"):
+        hash_val = hash_val[7:]
+
+    promotions_dir = os.path.join(RESEARCH_DIR, "promotions", hash_val)
+    if not os.path.isdir(promotions_dir):
+        return 0
+
+    demoted_count = 0
+    for filename in os.listdir(promotions_dir):
+        if not filename.endswith(".json"):
+            continue
+        filepath = os.path.join(promotions_dir, filename)
+        try:
+            with open(filepath) as f:
+                artifact = json.load(f)
+            if artifact.get("tier") == demote_from:
+                os.rename(filepath, filepath + ".demoted")
+                demoted_count += 1
+        except (json.JSONDecodeError, IOError, OSError):
+            continue
+
+    return demoted_count

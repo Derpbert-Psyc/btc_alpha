@@ -13,6 +13,8 @@ from ui.pages.composition_editor import composition_editor_page
 from ui.pages.preset_library import preset_library_page
 from ui.pages.triage_results import triage_results_page
 from ui.pages.parameter_sweep import parameter_sweep_page
+from ui.pages.shadow_workspace import shadow_workspace_page
+from ui.pages.live_workspace import live_workspace_page
 
 # Dark theme CSS
 DARK_CSS = """
@@ -88,6 +90,7 @@ body {
 .q-tabs { border-bottom: 1px solid var(--border) !important; }
 .q-tab { color: var(--text-dim) !important; text-transform: none !important; }
 .q-tab--active { color: var(--blue) !important; }
+.q-tab-panels { background: transparent !important; }
 .q-tab-panel { padding: 16px 0 !important; background-color: transparent !important; }
 /* Buttons */
 .q-btn[class*="bg-primary"] { background: var(--blue) !important; }
@@ -186,6 +189,18 @@ def presets():
 def triage(strategy_hash: str):
     ui.add_head_html(f"<style>{DARK_CSS}</style>")
     triage_results_page(strategy_hash)
+
+
+@ui.page("/shadow")
+def shadow():
+    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    shadow_workspace_page()
+
+
+@ui.page("/live")
+def live():
+    ui.add_head_html(f"<style>{DARK_CSS}</style>")
+    live_workspace_page()
 
 
 @ui.page("/sweep/{composition_id}")

@@ -1,0 +1,12 @@
+{
+  "tier": "SHADOW_VALIDATED",
+  "strategy_config_hash": "sha256:7ef63b7adb89948d35e866fc705d92a729287342af5df40e83bb15f73376a7ff",
+  "composition_spec_hash": "sha256:04d9e7a1f273f3d3c9cbd0cbabbbcdf41255e41ca9d9e339bdd9adee9a48ae0f",
+  "dataset_prefix": "manual",
+  "runner_economics": {},
+  "triage_result_summary": {
+    "promoted_via": "lifecycle_promotion",
+    "notes": ""
+  },
+  "timestamp": "2026-02-14T03:09:46.878531+00:00"
+}

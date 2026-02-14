@@ -127,11 +127,50 @@ VALID_BAR_TIMEFRAMES = {
 }
 VALID_SNAPSHOT_TIMEFRAMES_REGEX = re.compile(r'^[1-9][0-9]*(ms|s)$')
 
+_VALID_BAR_TF_RE = re.compile(r'^([1-9][0-9]*)(m|h|d)$')
+
+
+def _is_valid_bar_timeframe(tf: str) -> bool:
+    """Validate custom bar timeframe: must divide a day or be whole days."""
+    m = _VALID_BAR_TF_RE.match(tf)
+    if not m:
+        return False
+    value, unit = int(m.group(1)), m.group(2)
+    if unit == "m":
+        minutes = value
+    elif unit == "h":
+        minutes = value * 60
+    elif unit == "d":
+        minutes = value * 1440
+    else:
+        return False
+    if minutes <= 1440:
+        return 1440 % minutes == 0
+    return minutes % 1440 == 0
+
+
 # Timeframe to seconds mapping (for warmup calculation)
 TIMEFRAME_SECONDS: Dict[str, int] = {
     "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
     "1h": 3600, "4h": 14400, "12h": 43200, "1d": 86400, "3d": 259200,
 }
+
+
+def _parse_tf_seconds(tf: str) -> int:
+    """Parse any valid bar timeframe to seconds."""
+    if tf in TIMEFRAME_SECONDS:
+        return TIMEFRAME_SECONDS[tf]
+    m = _VALID_BAR_TF_RE.match(tf)
+    if m:
+        val, unit = int(m.group(1)), m.group(2)
+        if unit == "m":
+            return val * 60
+        if unit == "h":
+            return val * 3600
+        if unit == "d":
+            return val * 86400
+    return 60
+
 
 # ---------------------------------------------------------------------------
 # Operator name mapping
@@ -301,7 +340,7 @@ def step1_validate(spec: dict, target_ev: str,
         # Validate timeframe
         tf = inst.get("timeframe", "")
         if tf and tf not in VALID_BAR_TIMEFRAMES:
-            if not VALID_SNAPSHOT_TIMEFRAMES_REGEX.match(tf):
+            if not _is_valid_bar_timeframe(tf) and not VALID_SNAPSHOT_TIMEFRAMES_REGEX.match(tf):
                 errors.append(
                     f"indicator_instances[{i}]: invalid timeframe "
                     f"'{tf}'")
@@ -431,7 +470,7 @@ def step2_catalog_validate(spec: dict, target_ev: str) -> dict:
         outputs_used = inst.get("outputs_used", [])
         params = inst.get("parameters", {})
         tf = inst.get("timeframe", "1m")
-        tf_seconds = TIMEFRAME_SECONDS.get(tf, 60)
+        tf_seconds = _parse_tf_seconds(tf)
 
         instance_warmup = compute_instance_warmup(int_id, outputs_used, params)
         warmup_seconds = instance_warmup * tf_seconds
@@ -505,7 +544,7 @@ def step3_constraints(spec: dict, context: str,
         warmup = compute_instance_warmup(
             int_id, inst.get("outputs_used", []),
             inst.get("parameters", {}))
-        tf_sec = TIMEFRAME_SECONDS.get(inst.get("timeframe", "1m"), 60)
+        tf_sec = _parse_tf_seconds(inst.get("timeframe", "1m"))
         warmup_days = (warmup * tf_sec) / 86400
         if warmup_days > 90:
             msg = (f"Instance '{inst.get('label', '')}' warmup is "
