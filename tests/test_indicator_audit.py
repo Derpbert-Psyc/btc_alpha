@@ -405,7 +405,7 @@ class TestV5Determinism:
 # These strategies do NOT use RSI/ROC/Choppiness in conditions,
 # so their trade counts must remain identical.
 MACD_CONFLUENCE_TRADE_COUNT = 37
-CHOP_HARVESTER_TRADE_COUNT = 28
+CHOP_HARVESTER_TRADE_COUNT = 29
 
 
 @pytest.mark.slow

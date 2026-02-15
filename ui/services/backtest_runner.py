@@ -5,7 +5,12 @@ and the triage input (List[TradeEvent]).
 
 Key design:
   - Calls evaluate_signal_pipeline() as THE decision function
-  - Stop-loss, trailing, time-limit evaluated at bar close only (not intrabar)
+  - Two-tier main loop:
+    - Tier 1 (every 1m bar): price-based exits (STOP_LOSS, TRAILING_STOP) checked
+      against bar.low/bar.high, fill at stop price (simulates exchange stop orders)
+    - Tier 2 (entry cadence boundary): indicator assembly, signal pipeline,
+      TIME_LIMIT, signal exits
+  - Per-exit-rule evaluation_cadence (defaults to 1m)
   - Deterministic: same config + same data = same trades
   - Trade IDs derived from content (hash), not random
 """
@@ -874,6 +879,12 @@ def run_backtest(
     # Number of 1m bars per evaluation cycle
     eval_cadence_bars = eval_cadence_sec // 60
 
+    # Per-exit-rule evaluation cadence (for tier 1 vs tier 2 routing)
+    exit_rule_cadence_sec: List[int] = []
+    for rule in exit_rules:
+        cad = rule.get("evaluation_cadence", "1m")
+        exit_rule_cadence_sec.append(parse_timeframe_seconds(cad))
+
     # Resample bars for each instance's timeframe
     instance_bars: Dict[str, List[Bar]] = {}
     instance_outputs: Dict[str, Dict[str, List[Optional[float]]]] = {}
@@ -969,8 +980,100 @@ def run_backtest(
         if bar_1m_idx < max_warmup_1m:
             continue
 
-        # Only evaluate at evaluation cadence: last 1m bar of each bucket
-        # A cadence bucket completes when the NEXT bar would be in a new bucket
+        # ── TIER 1: Per-bar price-based exit checks ───────────────────
+        # Runs every 1m bar. Checks STOP_LOSS and TRAILING_STOP using
+        # bar.low/bar.high (simulates exchange stop order fills).
+        stop_exit_price = None
+        stop_exit_reason = None
+
+        if position is not None:
+            direction = position["direction"]
+            entry_price = position["entry_price"]
+
+            # Update trailing peak every bar (use high/low for accuracy)
+            if direction == "LONG":
+                trailing_peak = max(trailing_peak, bar.high)
+            else:
+                trailing_peak = min(trailing_peak, bar.low) if trailing_peak > 0 else bar.low
+
+            # Execution-params ATR/fixed stop (computed at entry)
+            if ep_stop_price is not None:
+                if direction == "LONG" and bar.low <= ep_stop_price:
+                    stop_exit_price = ep_stop_price
+                    stop_exit_reason = "STOP_LOSS"
+                elif direction == "SHORT" and bar.high >= ep_stop_price:
+                    stop_exit_price = ep_stop_price
+                    stop_exit_reason = "STOP_LOSS"
+
+            # Per-rule price-based exits (STOP_LOSS, TRAILING_STOP)
+            if stop_exit_price is None:
+                for ri, exit_rule in enumerate(exit_rules):
+                    rule_cad = exit_rule_cadence_sec[ri]
+                    # Check cadence: only evaluate if this bar is at this rule's boundary
+                    if rule_cad > 60:
+                        next_ts = bar.ts + 60
+                        if bar.ts // rule_cad == next_ts // rule_cad:
+                            continue  # Not at this rule's cadence boundary
+
+                    et = exit_rule.get("type", "SIGNAL")
+
+                    if et == "STOP_LOSS":
+                        params = exit_rule.get("parameters", {})
+                        if direction == "LONG":
+                            pct_str = params.get("percent_long", "0")
+                            pct = float(pct_str) if pct_str else 0
+                            if pct > 0:
+                                sp = entry_price * (1 - pct)
+                                if bar.low <= sp:
+                                    stop_exit_price = sp
+                                    stop_exit_reason = "STOP_LOSS"
+                                    break
+                        else:
+                            pct_str = params.get("percent_short", "0")
+                            pct = float(pct_str) if pct_str else 0
+                            if pct > 0:
+                                sp = entry_price * (1 + pct)
+                                if bar.high >= sp:
+                                    stop_exit_price = sp
+                                    stop_exit_reason = "STOP_LOSS"
+                                    break
+
+                    elif et == "TRAILING_STOP":
+                        params = exit_rule.get("parameters", {})
+                        if direction == "LONG":
+                            pct_str = params.get("percent_long", "0")
+                            pct = float(pct_str) if pct_str else 0
+                            if pct > 0 and trailing_peak > entry_price:
+                                ts_price = trailing_peak * (1 - pct)
+                                if bar.low <= ts_price:
+                                    stop_exit_price = ts_price
+                                    stop_exit_reason = "TRAILING_STOP"
+                                    break
+                        else:
+                            pct_str = params.get("percent_short", "0")
+                            pct = float(pct_str) if pct_str else 0
+                            if pct > 0 and trailing_peak > 0 and trailing_peak < entry_price:
+                                ts_price = trailing_peak * (1 + pct)
+                                if bar.high >= ts_price:
+                                    stop_exit_price = ts_price
+                                    stop_exit_reason = "TRAILING_STOP"
+                                    break
+
+            # Execute the stop exit immediately (fill at stop price)
+            if stop_exit_price is not None:
+                trade = _make_trade_event(
+                    position, bar_1m_idx, stop_exit_price, strategy_hash)
+                trades.append(trade)
+                mtm_tracker.close_position()
+                last_exit_eval_bar = eval_bar_count
+                position = None
+                trailing_peak = 0.0
+                ep_stop_price = None
+                continue  # Skip tier 2 for this bar
+
+        # ── TIER 2: Signal evaluation (entry cadence boundary) ────────
+        # Runs only at cadence boundaries. Handles indicator assembly,
+        # signal pipeline, TIME_LIMIT, signal exits, entries, flips.
         next_ts = bar.ts + 60
         current_bucket = bar.ts // eval_cadence_sec
         next_bucket = next_ts // eval_cadence_sec
@@ -1010,70 +1113,12 @@ def run_backtest(
                 "entry_price": round(position["entry_price"] * 100),  # To cents for framework
             }
 
-        # Check price-based exits BEFORE signal pipeline
-        # (stop loss, trailing stop, time limit — evaluated at close)
+        # TIME_LIMIT check (counts eval bars, stays at tier 2)
         exit_override_reason = None
-
         if position is not None:
-            current_close = bar.close
-            entry_price = position["entry_price"]
-            direction = position["direction"]
-
-            # Update trailing peak
-            if direction == "LONG":
-                trailing_peak = max(trailing_peak, current_close)
-            else:
-                trailing_peak = min(trailing_peak, current_close) if trailing_peak > 0 else current_close
-
-            # Execution-params ATR/fixed stop (computed at entry, checked every bar)
-            if ep_stop_price is not None:
-                if direction == "LONG" and current_close <= ep_stop_price:
-                    exit_override_reason = "STOP_LOSS"
-                elif direction == "SHORT" and current_close >= ep_stop_price:
-                    exit_override_reason = "STOP_LOSS"
-
-            for exit_rule in exit_rules:
-                if exit_override_reason is not None:
-                    break
+            for ri, exit_rule in enumerate(exit_rules):
                 et = exit_rule.get("type", "SIGNAL")
-
-                if et == "STOP_LOSS":
-                    params = exit_rule.get("parameters", {})
-                    mode = params.get("mode", "FIXED_PERCENT")
-                    if direction == "LONG":
-                        pct_str = params.get("percent_long", "0")
-                        pct = float(pct_str) if pct_str else 0
-                        stop_price = entry_price * (1 - pct)
-                        if current_close <= stop_price and pct > 0:
-                            exit_override_reason = "STOP_LOSS"
-                            break
-                    else:
-                        pct_str = params.get("percent_short", "0")
-                        pct = float(pct_str) if pct_str else 0
-                        stop_price = entry_price * (1 + pct)
-                        if current_close >= stop_price and pct > 0:
-                            exit_override_reason = "STOP_LOSS"
-                            break
-
-                elif et == "TRAILING_STOP":
-                    params = exit_rule.get("parameters", {})
-                    if direction == "LONG":
-                        pct_str = params.get("percent_long", "0")
-                        pct = float(pct_str) if pct_str else 0
-                        trail_stop = trailing_peak * (1 - pct)
-                        if current_close <= trail_stop and pct > 0 and trailing_peak > entry_price:
-                            exit_override_reason = "TRAILING_STOP"
-                            break
-                    else:
-                        pct_str = params.get("percent_short", "0")
-                        pct = float(pct_str) if pct_str else 0
-                        if trailing_peak > 0:
-                            trail_stop = trailing_peak * (1 + pct)
-                            if current_close >= trail_stop and pct > 0 and trailing_peak < entry_price:
-                                exit_override_reason = "TRAILING_STOP"
-                                break
-
-                elif et == "TIME_LIMIT":
+                if et == "TIME_LIMIT":
                     params = exit_rule.get("parameters", {})
                     limit_bars = params.get("time_limit_bars", 0)
                     if limit_bars > 0:
@@ -1159,7 +1204,7 @@ def run_backtest(
                 mtm_tracker.open_position()
 
         elif signal.action == "EXIT" and position is not None:
-            # Close trade
+            # Close trade (tier 2 exits use bar.close)
             trade = _make_trade_event(
                 position, bar_1m_idx, bar.close, strategy_hash)
             trades.append(trade)

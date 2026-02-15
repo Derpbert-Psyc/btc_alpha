@@ -1,9 +1,9 @@
-"""Gate 5: Stop-loss and trailing-stop parity — close-only evaluation.
+"""Gate 5: Stop-loss and trailing-stop parity — bar.low/bar.high evaluation.
 
 Tests:
-  - Stop loss triggers at correct bar
-  - Trailing stop triggers at correct bar
-  - Intrabar breach without close trigger does NOT fire (close-only)
+  - Stop loss triggers at correct bar (bar.low/bar.high check, fill at stop price)
+  - Trailing stop triggers at correct bar (bar.low/bar.high check, fill at trail price)
+  - Intrabar breach DOES fire (simulates exchange stop order on price touch)
   - Time limit exits at correct bar
 """
 
@@ -91,7 +91,7 @@ def _make_stop_loss_config():
 
 
 def test_stop_loss_triggers_at_correct_bar():
-    """Stop loss fires when close breaches stop price."""
+    """Stop loss fires when bar.low breaches stop price; fills at stop price."""
     bars = _make_stop_loss_bars()
     config = _make_stop_loss_config()
     trades, _, _ = run_backtest(config, bars, "sl_test")
@@ -101,11 +101,13 @@ def test_stop_loss_triggers_at_correct_bar():
     assert t.side == "long"
     # Entry at bar 5 (first bar where price > 100)
     assert t.entry_idx == 5
-    # Exit at bar 12 (first bar where close < 98 = 100*(1-0.02))
     # Entry price is 102, so stop = 102 * 0.98 = 99.96
-    # Bar 11 close=99 — below 99.96 → triggers
-    assert t.exit_idx == 11, f"Expected exit at bar 11, got {t.exit_idx}"
+    # Bar 10: close=100, low=99 → low < 99.96 → triggers (fill at 99.96)
+    assert t.exit_idx == 10, f"Expected exit at bar 10, got {t.exit_idx}"
     assert t.gross_return_bps < 0  # Loss
+    # Fill at stop price (99.96), not bar.close (100)
+    exit_px = t.exit_price.value / 100.0
+    assert abs(exit_px - 99.96) < 0.01, f"Expected fill at ~99.96, got {exit_px}"
 
 
 def _make_intrabar_breach_bars():
@@ -139,17 +141,21 @@ def _make_intrabar_breach_bars():
     return bars
 
 
-def test_close_only_evaluation():
-    """Intrabar low breach does NOT trigger stop — close-only evaluation."""
+def test_intrabar_breach_fires_stop():
+    """Intrabar low breach DOES trigger stop — simulates exchange stop order."""
     bars = _make_intrabar_breach_bars()
     config = _make_stop_loss_config()
-    trades, _, _ = run_backtest(config, bars, "close_only_test")
+    trades, _, _ = run_backtest(config, bars, "intrabar_test")
 
     assert len(trades) >= 1
     t = trades[0]
-    # Stop should NOT fire at bar 8 (low breaches but close=101 is above stop~99.96)
-    # Stop should fire at a later bar where close actually breaches
-    assert t.exit_idx != 8, "Stop fired on intrabar breach — should be close-only!"
+    # Stop SHOULD fire at bar 8 (low=95 breaches stop~99.96, even though close=101)
+    # This simulates a real exchange stop order that fills on price touch
+    assert t.exit_idx == 8, (
+        f"Stop should fire at bar 8 (low breaches stop), got {t.exit_idx}")
+    # Fill at stop price (99.96), not bar.low (95) or bar.close (101)
+    exit_px = t.exit_price.value / 100.0
+    assert abs(exit_px - 99.96) < 0.01, f"Expected fill at ~99.96, got {exit_px}"
 
 
 def _make_trailing_stop_bars():
@@ -225,7 +231,7 @@ def _make_trailing_stop_config():
 
 
 def test_trailing_stop_triggers():
-    """Trailing stop fires after peak, when price retraces by stop %."""
+    """Trailing stop fires after peak, when bar.low retraces by stop %."""
     bars = _make_trailing_stop_bars()
     config = _make_trailing_stop_config()
     trades, _, _ = run_backtest(config, bars, "trail_test")
@@ -234,10 +240,13 @@ def test_trailing_stop_triggers():
     t = trades[0]
     assert t.side == "long"
     assert t.entry_idx == 5
-    # Peak at bar 9 (110), trail stop = 110 * 0.97 = 106.7
-    # Bar 13 close=106 < 106.7 → trail stop fires
-    assert t.exit_idx == 13, f"Expected trailing stop at bar 13, got {t.exit_idx}"
-    assert t.gross_return_bps > 0  # Still profitable (entry 102, exit 106)
+    # Peak tracks bar.high: bar 9 high=111 → trailing_peak=111
+    # Trail stop = 111 * 0.97 = 107.67
+    # Bar 11: low=107 < 107.67 → trail stop fires, fill at 107.67
+    assert t.exit_idx == 11, f"Expected trailing stop at bar 11, got {t.exit_idx}"
+    assert t.gross_return_bps > 0  # Still profitable (entry 102, exit ~107.67)
+    exit_px = t.exit_price.value / 100.0
+    assert abs(exit_px - 107.67) < 0.01, f"Expected fill at ~107.67, got {exit_px}"
 
 
 def _make_time_limit_bars():
