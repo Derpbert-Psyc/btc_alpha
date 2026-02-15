@@ -11,6 +11,7 @@ Key design:
 """
 
 import hashlib
+import logging
 import math
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -469,6 +470,84 @@ def compute_linreg_slope(closes: List[float], period: int = 14) -> List[Optional
     return result
 
 
+def compute_adx(
+    highs: List[float], lows: List[float], closes: List[float],
+    period: int = 14,
+) -> Tuple[List[Optional[float]], List[Optional[float]], List[Optional[float]]]:
+    """Compute ADX, +DI, -DI using Wilder's smoothing.
+
+    Output range: 0.0-1.0 (ADX 25 traditional = 0.25).
+    Warmup: ~2*period bars before first valid output.
+    """
+    n = len(closes)
+    adx_out: List[Optional[float]] = [None] * n
+    plus_di_out: List[Optional[float]] = [None] * n
+    minus_di_out: List[Optional[float]] = [None] * n
+
+    if n < 2:
+        return adx_out, plus_di_out, minus_di_out
+
+    smoothed_plus_dm = None
+    smoothed_minus_dm = None
+    smoothed_tr = None
+    smoothed_dx = None
+    bars_seen = 0
+
+    for i in range(1, n):
+        up_move = highs[i] - highs[i - 1]
+        down_move = lows[i - 1] - lows[i]
+
+        plus_dm = up_move if (up_move > down_move and up_move > 0) else 0.0
+        minus_dm = down_move if (down_move > up_move and down_move > 0) else 0.0
+
+        tr = max(highs[i] - lows[i],
+                 abs(highs[i] - closes[i - 1]),
+                 abs(lows[i] - closes[i - 1]))
+
+        bars_seen += 1
+
+        # Wilder's smoothing for +DM, -DM, TR
+        if smoothed_plus_dm is None:
+            smoothed_plus_dm = plus_dm
+            smoothed_minus_dm = minus_dm
+            smoothed_tr = tr
+        else:
+            smoothed_plus_dm = smoothed_plus_dm * (period - 1) / period + plus_dm
+            smoothed_minus_dm = smoothed_minus_dm * (period - 1) / period + minus_dm
+            smoothed_tr = smoothed_tr * (period - 1) / period + tr
+
+        # Need at least `period` bars for DI smoothing
+        if bars_seen < period:
+            continue
+
+        # +DI and -DI as proportions (0.0-1.0)
+        if smoothed_tr == 0:
+            plus_di = 0.0
+            minus_di = 0.0
+        else:
+            plus_di = smoothed_plus_dm / smoothed_tr
+            minus_di = smoothed_minus_dm / smoothed_tr
+
+        plus_di_out[i] = plus_di
+        minus_di_out[i] = minus_di
+
+        # DX
+        di_sum = plus_di + minus_di
+        dx = abs(plus_di - minus_di) / di_sum if di_sum != 0 else 0.0
+
+        # Wilder's smoothing for DX → ADX
+        if smoothed_dx is None:
+            smoothed_dx = dx
+        else:
+            smoothed_dx = smoothed_dx * (period - 1) / period + dx / period
+
+        # Need another `period` bars for ADX smoothing
+        if bars_seen >= 2 * period:
+            adx_out[i] = smoothed_dx
+
+    return adx_out, plus_di_out, minus_di_out
+
+
 # ---------------------------------------------------------------------------
 # Diagnostic probe helpers (RATE_SCALE integer outputs)
 # ---------------------------------------------------------------------------
@@ -618,7 +697,8 @@ def compute_indicator_outputs(
 
     elif ind_id == 2:  # RSI
         period = int(params.get("period", params.get("length", 14)))
-        result["rsi"] = compute_rsi(closes, period)
+        result["rsi"] = [v / 100.0 if v is not None else None
+                         for v in compute_rsi(closes, period)]
 
     elif ind_id == 3:  # ATR
         period = int(params.get("period", params.get("length", 14)))
@@ -640,12 +720,20 @@ def compute_indicator_outputs(
         roc_vals = [None] * len(closes)
         for i in range(period, len(closes)):
             if closes[i - period] != 0:
-                roc_vals[i] = ((closes[i] - closes[i - period]) / closes[i - period]) * 100
+                roc_vals[i] = (closes[i] - closes[i - period]) / closes[i - period]
         result["roc"] = roc_vals
+
+    elif ind_id == 9:  # ADX
+        period = int(params.get("period", params.get("length", 14)))
+        adx, plus_di, minus_di = compute_adx(highs, lows, closes, period)
+        result["adx"] = adx
+        result["plus_di"] = plus_di
+        result["minus_di"] = minus_di
 
     elif ind_id == 10:  # Choppiness
         period = int(params.get("period", params.get("length", 14)))
-        result["choppiness"] = compute_choppiness(highs, lows, closes, period)
+        result["choppiness"] = [v / 100.0 if v is not None else None
+                                for v in compute_choppiness(highs, lows, closes, period)]
 
     elif ind_id == 11:  # Bollinger
         period = int(params.get("period", params.get("length", 20)))
@@ -695,7 +783,12 @@ def compute_indicator_outputs(
         result = compute_vol_regime(bars, dc_upper, dc_lower, ref)
 
     else:
-        # Stub: return None for all outputs
+        ind_name = INDICATOR_ID_TO_NAME.get(ind_id, f"ID_{ind_id}")
+        logging.getLogger(__name__).warning(
+            "Indicator %s (ID %d) not implemented in backtest runner. "
+            "All outputs will be None — conditions referencing it will never fire.",
+            ind_name, ind_id,
+        )
         known_outputs = INDICATOR_OUTPUTS.get(ind_id, {})
         for out_name in known_outputs:
             result[out_name] = [None] * len(bars)

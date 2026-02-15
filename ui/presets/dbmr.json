@@ -78,7 +78,7 @@
           "indicator": "rsi_15m",
           "output": "rsi",
           "operator": "<",
-          "value": 30
+          "value": 0.30
         }
       ],
       "condition_groups": []
@@ -98,7 +98,7 @@
           "indicator": "rsi_15m",
           "output": "rsi",
           "operator": ">",
-          "value": 70
+          "value": 0.70
         }
       ],
       "condition_groups": []
