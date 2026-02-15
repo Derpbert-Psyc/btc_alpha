@@ -887,6 +887,21 @@ def _lower_exit_rule(rule: dict, exit_type: str,
             params["atr_indicator_label"] = rule["atr_indicator_label"]
         fw["parameters"] = params
 
+    elif exit_type == "TRAILING_STOP":
+        params = {}
+        if "mode" in rule:
+            params["mode"] = rule["mode"]
+        if "value_long_bps" in rule:
+            params["percent_long"] = str(
+                Decimal(str(rule["value_long_bps"])) / 10000)
+        if "value_short_bps" in rule:
+            params["percent_short"] = str(
+                Decimal(str(rule["value_short_bps"])) / 10000)
+        for k in ("activation_profit_bps", "trail_distance_bps", "floor"):
+            if k in rule:
+                params[k] = rule[k]
+        fw["parameters"] = params
+
     elif exit_type == "MTM_DRAWDOWN_EXIT":
         params = {}
         if "drawdown_bps_long" in rule:
@@ -976,6 +991,7 @@ AUTHORING_ONLY_EXIT = {
     "drawdown_bps_long", "drawdown_bps_short", "time_limit_bars",
     "time_limit_reference_cadence",
     "atr_multiple", "atr_indicator_label",
+    "activation_profit_bps", "trail_distance_bps", "floor",
 }
 
 AUTHORING_ONLY_GATE = {

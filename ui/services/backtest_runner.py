@@ -1040,24 +1040,55 @@ def run_backtest(
 
                     elif et == "TRAILING_STOP":
                         params = exit_rule.get("parameters", {})
-                        if direction == "LONG":
-                            pct_str = params.get("percent_long", "0")
-                            pct = float(pct_str) if pct_str else 0
-                            if pct > 0 and trailing_peak > entry_price:
-                                ts_price = trailing_peak * (1 - pct)
-                                if bar.low <= ts_price:
-                                    stop_exit_price = ts_price
-                                    stop_exit_reason = "TRAILING_STOP"
-                                    break
+                        act_bps = params.get("activation_profit_bps")
+
+                        if act_bps is not None:
+                            # ── Bps-based trailing with breakeven floor ──
+                            act_bps = int(act_bps)
+                            dist_bps = int(params.get("trail_distance_bps", 200))
+                            floor_mode = params.get("floor", "breakeven")
+                            dist_abs = dist_bps * entry_price / 10000
+
+                            if direction == "LONG":
+                                unrealized = ((trailing_peak - entry_price) / entry_price) * 10000
+                                if unrealized >= act_bps:
+                                    ts_price = trailing_peak - dist_abs
+                                    if floor_mode == "breakeven":
+                                        ts_price = max(ts_price, entry_price)
+                                    if bar.low <= ts_price:
+                                        stop_exit_price = ts_price
+                                        stop_exit_reason = "TRAILING_STOP"
+                                        break
+                            else:
+                                unrealized = ((entry_price - trailing_peak) / entry_price) * 10000
+                                if unrealized >= act_bps:
+                                    ts_price = trailing_peak + dist_abs
+                                    if floor_mode == "breakeven":
+                                        ts_price = min(ts_price, entry_price)
+                                    if bar.high >= ts_price:
+                                        stop_exit_price = ts_price
+                                        stop_exit_reason = "TRAILING_STOP"
+                                        break
                         else:
-                            pct_str = params.get("percent_short", "0")
-                            pct = float(pct_str) if pct_str else 0
-                            if pct > 0 and trailing_peak > 0 and trailing_peak < entry_price:
-                                ts_price = trailing_peak * (1 + pct)
-                                if bar.high >= ts_price:
-                                    stop_exit_price = ts_price
-                                    stop_exit_reason = "TRAILING_STOP"
-                                    break
+                            # ── Existing percent-based trailing stop ──
+                            if direction == "LONG":
+                                pct_str = params.get("percent_long", "0")
+                                pct = float(pct_str) if pct_str else 0
+                                if pct > 0 and trailing_peak > entry_price:
+                                    ts_price = trailing_peak * (1 - pct)
+                                    if bar.low <= ts_price:
+                                        stop_exit_price = ts_price
+                                        stop_exit_reason = "TRAILING_STOP"
+                                        break
+                            else:
+                                pct_str = params.get("percent_short", "0")
+                                pct = float(pct_str) if pct_str else 0
+                                if pct > 0 and trailing_peak > 0 and trailing_peak < entry_price:
+                                    ts_price = trailing_peak * (1 + pct)
+                                    if bar.high >= ts_price:
+                                        stop_exit_price = ts_price
+                                        stop_exit_reason = "TRAILING_STOP"
+                                        break
 
             # Execute the stop exit immediately (fill at stop price)
             if stop_exit_price is not None:

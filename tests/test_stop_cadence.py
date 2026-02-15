@@ -380,3 +380,212 @@ class TestTimeLimitCountsEvalBars:
         assert trade.exit_idx >= 24, (
             f"TIME_LIMIT should count eval bars (exit at >=24), "
             f"got bar {trade.exit_idx}")
+
+
+# ---------------------------------------------------------------------------
+# Helpers for bps-trail tests
+# ---------------------------------------------------------------------------
+
+def _config_1m_entry_with_bps_trail(act_bps=200, dist_bps=200, floor="breakeven"):
+    """Config: 1m entry cadence with bps-based trailing stop."""
+    return {
+        "indicator_instances": [
+            {
+                "label": "ema_1m",
+                "indicator_id": 1,
+                "timeframe": "1m",
+                "parameters": {"period": 5},
+                "outputs_used": ["ema"],
+            },
+        ],
+        "entry_rules": [
+            {
+                "name": "long_entry",
+                "direction": "LONG",
+                "evaluation_cadence": "1m",
+                "conditions": [
+                    {"indicator": "ema_1m", "output": "ema",
+                     "operator": ">", "value": "0"},
+                ],
+                "condition_groups": [],
+            },
+        ],
+        "exit_rules": [
+            {
+                "type": "TRAILING_STOP",
+                "evaluation_cadence": "1m",
+                "applies_to": ["LONG"],
+                "parameters": {
+                    "activation_profit_bps": act_bps,
+                    "trail_distance_bps": dist_bps,
+                    "floor": floor,
+                },
+            },
+        ],
+        "gate_rules": [],
+        "execution_params": {
+            "direction": "LONG",
+            "leverage": 1.0,
+            "flip_enabled": False,
+            "post_exit_cooldown_bars": 0,
+            "stop_loss": None,
+            "position_sizing": None,
+            "entry_type": "MARKET",
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# BT-1: Bps trail not active below threshold
+# ---------------------------------------------------------------------------
+
+class TestBpsTrailNotActiveBelow:
+    def test_bps_trail_not_active_below_threshold(self):
+        """Entry at $100. Price rises to $101.50 (150 bps < 200 threshold),
+        then reverses. Trail should NOT fire."""
+        prices = []
+        # 5 bars warmup (EMA period=5)
+        for _ in range(5):
+            prices.append((100.0, 100.5, 99.5))
+        # Bar 5: entry at $100
+        prices.append((100.0, 100.5, 99.5))
+        # Bar 6-7: rise to 101.50 peak (150 bps, below 200 threshold)
+        prices.append((101.0, 101.5, 100.5))
+        prices.append((101.5, 101.5, 101.0))
+        # Bar 8-9: reverse down hard
+        prices.append((99.0, 100.0, 98.0))
+        prices.append((97.0, 98.0, 96.0))
+        # Extra bars
+        prices.append((97.0, 98.0, 96.0))
+
+        bars = _make_bars(prices)
+        config = _config_1m_entry_with_bps_trail(act_bps=200, dist_bps=200)
+        trades, _, _ = run_backtest(config, bars, strategy_hash="bt1")
+
+        # With no other exit rule configured, position may stay open or exit
+        # via end-of-data. The key assertion is that no trade exits at a
+        # bps-trail price. If a trade exists, its exit price should NOT be
+        # near the would-be trail level (~$99.50 = 101.50 - 2.00).
+        for t in trades:
+            exit_price_float = t.exit_price.value / 100.0
+            assert abs(exit_price_float - 99.50) > 0.5, (
+                f"Trail should NOT fire below threshold, but got "
+                f"exit at ${exit_price_float:.2f}")
+
+
+# ---------------------------------------------------------------------------
+# BT-2: Bps trail activates and exits
+# ---------------------------------------------------------------------------
+
+class TestBpsTrailActivatesAndExits:
+    def test_bps_trail_activates_and_exits(self):
+        """Entry at $100. Peak=$102.50 (250 bps > 200 threshold).
+        Trail price = 102.50 - (200*100/10000) = $100.50.
+        Next bar low=$100.00 < $100.50 → exit at $100.50."""
+        prices = []
+        # 5 bars warmup
+        for _ in range(5):
+            prices.append((100.0, 100.5, 99.5))
+        # Bar 5: entry at $100
+        prices.append((100.0, 100.5, 99.5))
+        # Bar 6: rise — high=$102.50 (trailing_peak = 102.50)
+        prices.append((102.0, 102.5, 101.0))
+        # Bar 7: drop — low=$100.00 < trail at $100.50
+        prices.append((100.5, 101.0, 100.0))
+        # Extra
+        prices.append((100.0, 101.0, 99.0))
+
+        bars = _make_bars(prices)
+        config = _config_1m_entry_with_bps_trail(act_bps=200, dist_bps=200)
+        trades, _, _ = run_backtest(config, bars, strategy_hash="bt2")
+
+        assert len(trades) >= 1, f"Expected at least 1 trade, got {len(trades)}"
+        trade = trades[0]
+        exit_price_float = trade.exit_price.value / 100.0
+        # trail_price = 102.50 - (200 * 100 / 10000) = 100.50
+        assert abs(exit_price_float - 100.50) < 0.05, (
+            f"Exit price should be ~$100.50, got ${exit_price_float:.2f}")
+
+
+# ---------------------------------------------------------------------------
+# BT-3: Bps trail breakeven floor
+# ---------------------------------------------------------------------------
+
+class TestBpsTrailBreakevenFloor:
+    def test_bps_trail_breakeven_floor(self):
+        """Entry at $100. Peak=$103 (300 bps > 200 threshold).
+        dist_bps=400 → trail = 103 - (400*100/10000) = 103 - 4 = $99.
+        But floor=breakeven → clamp to $100.
+        Next bar low=$99.50 < $100 → exit at $100 (breakeven)."""
+        prices = []
+        # 5 bars warmup
+        for _ in range(5):
+            prices.append((100.0, 100.5, 99.5))
+        # Bar 5: entry at $100
+        prices.append((100.0, 100.5, 99.5))
+        # Bar 6: rise — high=$103.00
+        prices.append((102.5, 103.0, 101.0))
+        # Bar 7: drop — low=$99.50 < floor at $100
+        prices.append((99.5, 101.0, 99.50))
+        # Extra
+        prices.append((99.0, 100.0, 98.0))
+
+        bars = _make_bars(prices)
+        config = _config_1m_entry_with_bps_trail(
+            act_bps=200, dist_bps=400, floor="breakeven")
+        trades, _, _ = run_backtest(config, bars, strategy_hash="bt3")
+
+        assert len(trades) >= 1, f"Expected at least 1 trade, got {len(trades)}"
+        trade = trades[0]
+        exit_price_float = trade.exit_price.value / 100.0
+        # Floored at entry price = $100
+        assert abs(exit_price_float - 100.0) < 0.05, (
+            f"Exit price should be ~$100 (breakeven), got ${exit_price_float:.2f}")
+
+
+# ---------------------------------------------------------------------------
+# BT-4: Bps trail coexists with fixed stop
+# ---------------------------------------------------------------------------
+
+class TestBpsTrailCoexistsWithFixedStop:
+    def test_bps_trail_coexists_with_fixed_stop(self):
+        """Entry at $100. Fixed stop at $98 (2%), bps-trail (act=200, dist=100).
+        Peak=$103 → trail = 103 - (100*100/10000) = $102, floored at $100.
+        Drop to low=$99: fixed stop $98 NOT breached, trail $102 IS breached.
+        Trail fires at $102."""
+        prices = []
+        # 5 bars warmup
+        for _ in range(5):
+            prices.append((100.0, 100.5, 99.5))
+        # Bar 5: entry at $100
+        prices.append((100.0, 100.5, 99.5))
+        # Bar 6: rise — high=$103
+        prices.append((102.5, 103.0, 101.0))
+        # Bar 7: drop — low=$99, breaches trail at $102 but not fixed stop at $98
+        prices.append((99.5, 101.0, 99.0))
+        # Extra
+        prices.append((99.0, 100.0, 98.0))
+
+        bars = _make_bars(prices)
+        config = _config_1m_entry_with_bps_trail(
+            act_bps=200, dist_bps=100, floor="breakeven")
+        # Add fixed stop at 2% ($98)
+        config["exit_rules"].insert(0, {
+            "type": "STOP_LOSS",
+            "evaluation_cadence": "1m",
+            "applies_to": ["LONG"],
+            "parameters": {
+                "mode": "FIXED_PERCENT",
+                "percent_long": "0.02",
+                "percent_short": "0",
+            },
+        })
+        trades, _, _ = run_backtest(config, bars, strategy_hash="bt4")
+
+        assert len(trades) >= 1, f"Expected at least 1 trade, got {len(trades)}"
+        trade = trades[0]
+        exit_price_float = trade.exit_price.value / 100.0
+        # Trail at $102 fires before fixed stop at $98.
+        # Exit price should be $102 (trail), not $98 (fixed stop).
+        assert abs(exit_price_float - 102.0) < 0.05, (
+            f"Exit price should be ~$102 (trail), got ${exit_price_float:.2f}")

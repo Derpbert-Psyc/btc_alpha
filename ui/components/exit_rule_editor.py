@@ -184,6 +184,24 @@ def _render_trailing_stop_params(state, idx, rule, on_change):
         vs.on("change", lambda e: _update_exit_field(
             state, idx, "value_short_bps", int(e.args), on_change))
 
+    with ui.row().classes("gap-4 mt-1"):
+        act = ui.number(value=rule.get("activation_profit_bps", 200),
+                        label="Activate (bps)").classes("w-32").props("dense")
+        act.on("change", lambda e: _update_exit_field(
+            state, idx, "activation_profit_bps", int(e.args), on_change))
+
+        dist = ui.number(value=rule.get("trail_distance_bps", 200),
+                         label="Trail dist (bps)").classes("w-32").props("dense")
+        dist.on("change", lambda e: _update_exit_field(
+            state, idx, "trail_distance_bps", int(e.args), on_change))
+
+        ui.select(["breakeven", "none"],
+                  value=rule.get("floor", "breakeven"),
+                  label="Floor",
+                  on_change=lambda e: _update_exit_field(
+                      state, idx, "floor", e.value, on_change),
+                  ).classes("w-32").props("dense")
+
 
 def _render_time_limit_params(state, idx, rule, on_change):
     with ui.row().classes("gap-4 mt-2"):

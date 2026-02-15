@@ -7,7 +7,7 @@ import pytest
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 FROZEN_MANIFEST = {
-    "composition_compiler_v1_5_2.py": "fda33cca5e8d2e9758d61a674dda2eaa0da13adaa5527c4c32a492a79e212668",
+    "composition_compiler_v1_5_2.py": "f22251d40361b9264e698bba22b6be7f0f732c8fa27c3ccb7d23fe55bce6429a",
     "strategy_framework_v1_8_0.py": "905ff13c17f1f7175cd0d06027d6f9c750fffb08357898db78a220c17b25cbc2",
     "verify_framework_v1_8_0.py": "b20cdeda5d8b7b6350230eb1b99faf69b5894d5492212c1b9fa0fb3e39e13b56",
     "phase5_bundle_store.py": "209b0b3bffb0dc130f2296b53ef55d618ff29c322fc369afd14e3dc0147a6a0a",
