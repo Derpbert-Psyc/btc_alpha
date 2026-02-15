@@ -1,0 +1,289 @@
+{
+  "resolved_artifact": {
+    "indicator_instances": [
+      {
+        "label": "atr_4h",
+        "indicator_id": 3,
+        "timeframe": "4h",
+        "parameters": {
+          "period": 14
+        },
+        "outputs_used": [
+          "atr"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "dc_5m",
+        "indicator_id": 14,
+        "timeframe": "5m",
+        "parameters": {
+          "period": 288
+        },
+        "outputs_used": [
+          "basis",
+          "lower",
+          "upper"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "dc_pos",
+        "indicator_id": 30,
+        "timeframe": "5m",
+        "parameters": {
+          "length": 288,
+          "donchian_label": "dc_5m"
+        },
+        "outputs_used": [
+          "percent_b"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "roc_1d_p14_filter",
+        "indicator_id": 8,
+        "timeframe": "1d",
+        "parameters": {
+          "period": 14.0
+        },
+        "outputs_used": [
+          "roc"
+        ],
+        "data_source": "BAR",
+        "bar_provider": null,
+        "warmup_bars": null,
+        "role": null
+      },
+      {
+        "label": "vol_regime",
+        "indicator_id": 31,
+        "timeframe": "5m",
+        "parameters": {
+          "reference_vol_microbps": 3333365,
+          "donchian_label": "dc_5m"
+        },
+        "outputs_used": [
+          "vol_ratio"
+        ],
+        "data_source": "BAR",
+        "bar_provider": "EXCHANGE_CANDLES",
+        "warmup_bars": null,
+        "role": null
+      }
+    ],
+    "entry_rules": [
+      {
+        "name": "long_entry",
+        "direction": "LONG",
+        "evaluation_cadence": "5m",
+        "conditions": [
+          {
+            "indicator": "dc_pos",
+            "output": "percent_b",
+            "operator": "<",
+            "value": "200000",
+            "ref_indicator": null,
+            "ref_output": null
+          },
+          {
+            "indicator": "roc_1d_p14_filter",
+            "output": "roc",
+            "operator": ">=",
+            "value": 0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "condition_groups": []
+      },
+      {
+        "name": "short_entry",
+        "direction": "SHORT",
+        "evaluation_cadence": "5m",
+        "conditions": [
+          {
+            "indicator": "dc_pos",
+            "output": "percent_b",
+            "operator": ">",
+            "value": "800000",
+            "ref_indicator": null,
+            "ref_output": null
+          },
+          {
+            "indicator": "roc_1d_p14_filter",
+            "output": "roc",
+            "operator": "<=",
+            "value": 0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "condition_groups": []
+      }
+    ],
+    "exit_rules": [
+      {
+        "name": "long_signal_exit",
+        "type": "SIGNAL",
+        "applies_to": [
+          "LONG"
+        ],
+        "evaluation_cadence": "5m",
+        "conditions": [
+          {
+            "indicator": "dc_pos",
+            "output": "percent_b",
+            "operator": ">",
+            "value": 500000.0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "parameters": {}
+      },
+      {
+        "name": "short_signal_exit",
+        "type": "SIGNAL",
+        "applies_to": [
+          "SHORT"
+        ],
+        "evaluation_cadence": "5m",
+        "conditions": [
+          {
+            "indicator": "dc_pos",
+            "output": "percent_b",
+            "operator": "<",
+            "value": 500000.0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "parameters": {}
+      },
+      {
+        "name": "atr_stop",
+        "type": "STOP_LOSS",
+        "applies_to": [
+          "LONG",
+          "SHORT"
+        ],
+        "evaluation_cadence": "1m",
+        "conditions": [],
+        "parameters": {
+          "mode": "ATR_MULTIPLE",
+          "atr_multiple": 1.5,
+          "atr_indicator_label": "atr_4h"
+        }
+      }
+    ],
+    "gate_rules": [
+      {
+        "name": "vol_regime_gate",
+        "conditions": [
+          {
+            "indicator": "vol_regime",
+            "output": "vol_ratio",
+            "operator": ">=",
+            "value": 2400000.0,
+            "ref_indicator": null,
+            "ref_output": null
+          },
+          {
+            "indicator": "vol_regime",
+            "output": "vol_ratio",
+            "operator": "<=",
+            "value": 3500000.0,
+            "ref_indicator": null,
+            "ref_output": null
+          }
+        ],
+        "on_close_policy": "HOLD_CURRENT"
+      }
+    ],
+    "archetype_tags": [
+      "mean_reversion",
+      "range_trading"
+    ],
+    "execution_params": {
+      "direction": "BOTH",
+      "leverage": 5.0,
+      "position_sizing": {
+        "mode": "RISK_FRACTION",
+        "risk_fraction_bps": 10000
+      },
+      "flip_enabled": true,
+      "post_exit_cooldown_bars": 144,
+      "stop_loss": {
+        "mode": "ATR_MULTIPLE",
+        "atr_multiple": 1.5,
+        "atr_indicator_label": "atr_4h"
+      },
+      "funding_model": {},
+      "entry_type": "MARKET",
+      "take_profit": null,
+      "trailing_stop": null,
+      "time_limit_bars": null,
+      "time_limit_reference_cadence": null,
+      "time_limit_allows_flip": false,
+      "scale_in": null,
+      "trade_rate_limit": null,
+      "slippage_budget": null,
+      "warmup_restart_policy": null,
+      "mtm_drawdown_exit": null,
+      "strict_entry_paths": null,
+      "strict_exit_paths": null
+    },
+    "engine_version": "1.8.0"
+  },
+  "strategy_config_hash": "sha256:946e88b7807ba7934438e86f07af9f8a13185ec49d2080a6c685adb09853408a",
+  "lowering_report": {
+    "composition_id": "",
+    "composition_version": "1.0.0",
+    "composition_spec_hash": "sha256:9866633b417b6f0357fa09dc6f7a6c8c6169174e1779b63182be3571d1383aa3",
+    "strategy_config_hash": "sha256:946e88b7807ba7934438e86f07af9f8a13185ec49d2080a6c685adb09853408a",
+    "timestamp": "2026-02-15T05:10:34.736786+00:00",
+    "compiler_version": "1.0.0",
+    "lowering_pipeline_version": "1.0.0",
+    "capability_registry_version": "1.0.0",
+    "capability_registry_hash": "sha256:1b32ed118b61b388e64369d64d8aa7b669d7320ad3f39df451c457599a867e95",
+    "framework_schema_version": "1.8.0",
+    "framework_schema_hash": "sha256:daf558845dc28f9923e5bc0826e10a45525731d5268cdf5b9fba1bbc329a5c03",
+    "transformations": [
+      {
+        "step": "field_stripped",
+        "fields": [
+          "composition_id",
+          "description",
+          "display_name",
+          "group",
+          "metadata",
+          "min_engine_version",
+          "role",
+          "target_engine_version",
+          "target_instrument",
+          "target_variant",
+          "version"
+        ]
+      }
+    ],
+    "warnings": [],
+    "effective_warmup": {
+      "bars": 14.0,
+      "timeframe": "1d",
+      "duration_days": 14.0,
+      "dominating_instance": "roc_1d_p14_filter"
+    }
+  },
+  "lowering_report_semantic_hash": "sha256:4c431de7f925b02d7db0e42a7af7361b6ac530fb4271838d39648a0c1b476d36",
+  "lowering_report_full_hash": "sha256:9e469918cfe394f9848af1db657c677f4dca4e520b3876f1a5c38507d3fd8e1f"
+}

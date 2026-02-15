@@ -1,0 +1,144 @@
+{
+  "strategy_config_hash": "sha256:349f5fb549b66a9d1a3c55f7cdb84bc6fb8371af797e16e2023f7546cc1deb3b",
+  "dataset_prefix": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31",
+  "dataset_filename": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
+  "runner_economics": {
+    "fee_rate": 0.0006,
+    "slippage_bps": 10,
+    "starting_capital": 10000
+  },
+  "trade_count": 28,
+  "bar_count": 570241,
+  "triage_v2": {
+    "test_results": [
+      {
+        "name": "1: Expectancy + PF",
+        "status": "PASS",
+        "detail": "Expectancy: +43.8 bps/trade | PF: 1.43 (positive but thin) | Win rate: 71.4%",
+        "metrics": {
+          "expectancy_bps": 43.82,
+          "profit_factor": "1.43",
+          "profit_factor_label": "positive but thin",
+          "win_rate": 71.43,
+          "avg_win_bps": 202.55,
+          "avg_loss_bps": 353.0,
+          "total_pnl_bps": 1227
+        }
+      },
+      {
+        "name": "2: Profit Concentration",
+        "status": "WARN",
+        "detail": "PnL drops 59% after removing top 2 trade(s): +506 bps (was +1227 bps)",
+        "metrics": {
+          "total_pnl_bps": 1227,
+          "trades_removed": 2,
+          "remaining_pnl_bps": 506,
+          "pnl_drop_pct": 58.8
+        }
+      },
+      {
+        "name": "3: Temporal Consistency",
+        "status": "PASS",
+        "detail": "All 4 windows within 15pp of overall 71% win rate (worst: 60%, drop: 11pp)",
+        "metrics": {
+          "overall_win_rate": 71.43,
+          "window_size": 10,
+          "num_windows": 4,
+          "worst_window_wr": 60.0,
+          "max_drop_pp": 11.4
+        }
+      },
+      {
+        "name": "4: Drawdown",
+        "status": "PASS",
+        "detail": "Max DD: 11.1% | Max consecutive losses: 2 (932 bps)",
+        "metrics": {
+          "max_drawdown_pct": 11.15,
+          "max_drawdown_dollar": 1363.78,
+          "max_consecutive_losses": 2,
+          "worst_consecutive_loss_bps": 932.0,
+          "final_equity": 11159.46
+        }
+      },
+      {
+        "name": "5: OOS Holdout",
+        "status": "INSUFFICIENT DATA",
+        "detail": "Only 5 OOS trades (need 10). Manual approval required for shadow promotion.",
+        "metrics": {
+          "train_trades": 23,
+          "oos_trades": 5,
+          "split_bar_idx": 456192,
+          "oos_sharpe": null,
+          "train_sharpe": 0.1952238618171131
+        }
+      },
+      {
+        "name": "6: Cost Ramp",
+        "status": "WARN",
+        "detail": "R\u00b2: NOT EVALUATED (< 50 trades) | Breakeven: 75 bps (2.4x operating, WARN) | WR@100bps: 64% (PASS)",
+        "metrics": {
+          "breakeven_cost_bps": 74.8,
+          "breakeven_headroom_ratio": 2.41,
+          "r_squared": null,
+          "r_squared_status": "NOT EVALUATED",
+          "win_rate_at_100bps": 64.3
+        }
+      }
+    ],
+    "tier": "A",
+    "tier_action": "Manual review required (LOW CONFIDENCE downgrades A action to B)",
+    "flags": [
+      "LOW CONFIDENCE \u2014 Wilson 95% LB: 52.9%",
+      "2: Profit Concentration WARN \u2014 PnL drops 59% after removing top 2 trade(s): +506 bps (was +1227 bps)",
+      "6: Cost Ramp WARN \u2014 R\u00b2: NOT EVALUATED (< 50 trades) | Breakeven: 75 bps (2.4x operating, WARN) | WR@100bps: 64% (PASS)"
+    ],
+    "warnings": [
+      "2: Profit Concentration: PnL drops 59% after removing top 2 trade(s): +506 bps (was +1227 bps)",
+      "6: Cost Ramp: R\u00b2: NOT EVALUATED (< 50 trades) | Breakeven: 75 bps (2.4x operating, WARN) | WR@100bps: 64% (PASS)"
+    ],
+    "metrics": {
+      "trade_count": 28,
+      "win_rate": 71.43,
+      "expectancy_bps": 43.82,
+      "profit_factor": "1.43",
+      "total_pnl_bps": 1227,
+      "breakeven_cost_bps": 74.8,
+      "wilson_lb": 52.94,
+      "max_drawdown_pct": 11.15,
+      "max_consecutive_losses": 2,
+      "worst_consecutive_loss_bps": 932.0
+    },
+    "cost_ramp_table": [
+      {
+        "cost_bps": 25,
+        "win_rate": 71.4,
+        "sharpe": 0.1642,
+        "total_pnl_bps": 1395,
+        "profit_factor": "1.50"
+      },
+      {
+        "cost_bps": 50,
+        "win_rate": 71.4,
+        "sharpe": 0.0818,
+        "total_pnl_bps": 695,
+        "profit_factor": "1.23"
+      },
+      {
+        "cost_bps": 100,
+        "win_rate": 64.3,
+        "sharpe": -0.083,
+        "total_pnl_bps": -705,
+        "profit_factor": "0.79"
+      },
+      {
+        "cost_bps": 200,
+        "win_rate": 46.4,
+        "sharpe": -0.4124,
+        "total_pnl_bps": -3505,
+        "profit_factor": "0.25"
+      }
+    ],
+    "tier_reasoning": "Base win rate: 71.4% (A)\nWilson 95% LB: 52.9% (C) \u2014 LOW CONFIDENCE\nCost ramp modifier: PASS (6430% at 100bps, floor 0.55)\nTest overrides: None\nOOS status: INSUFFICIENT DATA (5 OOS trades)"
+  },
+  "timestamp": "20260214T170455Z"
+}

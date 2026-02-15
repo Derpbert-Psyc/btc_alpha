@@ -1,0 +1,70 @@
+{
+  "composition_id": "a8295cfe-98f3-4edd-acba-2ef709507bee",
+  "param_name": "roc_1d_p12_filter.period",
+  "timestamp": "20260215T043917Z",
+  "results": [
+    {
+      "param_value": 6.6,
+      "expectancy_bps": 123.67,
+      "win_rate": 77.78,
+      "passed": true,
+      "trades": 9,
+      "hash": "sha256:875da5a87",
+      "is_default": false
+    },
+    {
+      "param_value": 8.4,
+      "expectancy_bps": 36.2,
+      "win_rate": 60.0,
+      "passed": true,
+      "trades": 10,
+      "hash": "sha256:e5938422f",
+      "is_default": false
+    },
+    {
+      "param_value": 10.2,
+      "expectancy_bps": 40.5,
+      "win_rate": 60.0,
+      "passed": true,
+      "trades": 10,
+      "hash": "sha256:a547fc017",
+      "is_default": false
+    },
+    {
+      "param_value": 12.0,
+      "expectancy_bps": -88.1,
+      "win_rate": 50.0,
+      "passed": false,
+      "trades": 10,
+      "hash": "sha256:10d845313",
+      "is_default": true
+    },
+    {
+      "param_value": 13.8,
+      "expectancy_bps": -65.4,
+      "win_rate": 50.0,
+      "passed": false,
+      "trades": 10,
+      "hash": "sha256:2b928614c",
+      "is_default": false
+    },
+    {
+      "param_value": 15.6,
+      "expectancy_bps": -65.4,
+      "win_rate": 50.0,
+      "passed": false,
+      "trades": 10,
+      "hash": "sha256:84bca97ac",
+      "is_default": false
+    },
+    {
+      "param_value": 17.4,
+      "expectancy_bps": -65.4,
+      "win_rate": 50.0,
+      "passed": false,
+      "trades": 10,
+      "hash": "sha256:170103451",
+      "is_default": false
+    }
+  ]
+}

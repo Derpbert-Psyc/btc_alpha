@@ -1,0 +1,1765 @@
+{
+  "strategy_config_hash": "sha256:f4ad7202048b0a20245c216f513a4ebb6044eb1dcc7a1300726c1c0bb443ee06",
+  "dataset_prefix": "btcusdt_binance_spot_1m_2018_to_2026",
+  "dataset_filename": "btcusdt_binance_spot_1m_2018_to_2026.parquet",
+  "runner_economics": {
+    "fee_rate": 0.0006,
+    "slippage_bps": 10,
+    "starting_capital": 10000
+  },
+  "trade_count": 162,
+  "bar_count": 4245673,
+  "triage_v2": {
+    "test_results": [
+      {
+        "name": "1: Expectancy + PF",
+        "status": "PASS",
+        "detail": "Expectancy: +11.0 bps/trade | PF: 1.08 (positive but thin) | Win rate: 67.3%",
+        "metrics": {
+          "expectancy_bps": 11.04,
+          "profit_factor": "1.08",
+          "profit_factor_label": "positive but thin",
+          "win_rate": 67.28,
+          "avg_win_bps": 211.98,
+          "avg_loss_bps": 402.23,
+          "total_pnl_bps": 1788
+        }
+      },
+      {
+        "name": "2: Profit Concentration",
+        "status": "FAIL",
+        "detail": "Removing top 9 trade(s) flips PnL negative: -2120 bps (was +1788 bps)",
+        "metrics": {
+          "total_pnl_bps": 1788,
+          "trades_removed": 9,
+          "remaining_pnl_bps": -2120,
+          "pnl_drop_pct": 218.6
+        }
+      },
+      {
+        "name": "3: Temporal Consistency",
+        "status": "PASS",
+        "detail": "All 12 windows within 15pp of overall 67% win rate (worst: 60%, drop: 7pp)",
+        "metrics": {
+          "overall_win_rate": 67.28,
+          "window_size": 25,
+          "num_windows": 12,
+          "worst_window_wr": 60.0,
+          "max_drop_pp": 7.3
+        }
+      },
+      {
+        "name": "4: Drawdown",
+        "status": "WARN",
+        "detail": "WARN: max DD 29.9% (20-30% range) AND consecutive loss 1687 bps (1500-2500 range)",
+        "metrics": {
+          "max_drawdown_pct": 29.95,
+          "max_drawdown_dollar": 3201.08,
+          "max_consecutive_losses": 5,
+          "worst_consecutive_loss_bps": 1687.0,
+          "final_equity": 10765.32
+        }
+      },
+      {
+        "name": "5: OOS Holdout",
+        "status": "PASS",
+        "detail": "OOS Sharpe 0.2260, Train 0.0220, ratio 10.27 (10 OOS trades)",
+        "metrics": {
+          "train_trades": 152,
+          "oos_trades": 10,
+          "split_bar_idx": 3396538,
+          "train_sharpe": 0.022,
+          "oos_sharpe": 0.226,
+          "oos_to_train_ratio": 10.2731
+        }
+      },
+      {
+        "name": "6: Cost Ramp",
+        "status": "FAIL",
+        "detail": "R\u00b2: 1.000 (PASS) | Breakeven: 42 bps (1.4x operating, FAIL) | WR@100bps: 54% (WARN)",
+        "metrics": {
+          "breakeven_cost_bps": 42.0,
+          "breakeven_headroom_ratio": 1.35,
+          "r_squared": 1.0,
+          "r_squared_status": "PASS",
+          "win_rate_at_100bps": 54.3
+        }
+      }
+    ],
+    "tier": "C",
+    "tier_action": "Do not deploy. Investigate only.",
+    "flags": [
+      "LOW CONFIDENCE \u2014 Wilson 95% LB: 59.7%",
+      "4: Drawdown WARN \u2014 WARN: max DD 29.9% (20-30% range) AND consecutive loss 1687 bps (1500-2500 range)"
+    ],
+    "warnings": [
+      "4: Drawdown: WARN: max DD 29.9% (20-30% range) AND consecutive loss 1687 bps (1500-2500 range)"
+    ],
+    "metrics": {
+      "trade_count": 162,
+      "win_rate": 67.28,
+      "expectancy_bps": 11.04,
+      "profit_factor": "1.08",
+      "total_pnl_bps": 1788,
+      "breakeven_cost_bps": 42.0,
+      "wilson_lb": 59.73,
+      "max_drawdown_pct": 29.95,
+      "max_consecutive_losses": 5,
+      "worst_consecutive_loss_bps": 1687.0
+    },
+    "cost_ramp_table": [
+      {
+        "cost_bps": 25,
+        "win_rate": 67.3,
+        "sharpe": 0.0478,
+        "total_pnl_bps": 2760,
+        "profit_factor": "1.13"
+      },
+      {
+        "cost_bps": 50,
+        "win_rate": 63.6,
+        "sharpe": -0.0224,
+        "total_pnl_bps": -1290,
+        "profit_factor": "0.94"
+      },
+      {
+        "cost_bps": 100,
+        "win_rate": 54.3,
+        "sharpe": -0.1628,
+        "total_pnl_bps": -9390,
+        "profit_factor": "0.63"
+      },
+      {
+        "cost_bps": 200,
+        "win_rate": 38.9,
+        "sharpe": -0.4436,
+        "total_pnl_bps": -25590,
+        "profit_factor": "0.25"
+      }
+    ],
+    "tier_reasoning": "Base win rate: 67.3% (B)\nWilson 95% LB: 59.7% (C) \u2014 LOW CONFIDENCE\nCost ramp modifier: PASS (5430% at 100bps, floor 0.5)\nTest overrides: Test 2 FAIL (profit concentration) \u2192 max C\nOOS status: PASS (10 OOS trades, OOS Sharpe 0.226)"
+  },
+  "trade_details": [
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-02-26 13:19",
+      "exit_time": "2018-02-27 09:39",
+      "entry_price": "10,178.00",
+      "exit_price": "10,774.99",
+      "pnl_usd": "-596.99",
+      "pnl_bps": -587,
+      "bars_held": 1220
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-03-10 10:49",
+      "exit_time": "2018-03-10 18:09",
+      "entry_price": "9,337.96",
+      "exit_price": "9,016.00",
+      "pnl_usd": "+321.96",
+      "pnl_bps": 345,
+      "bars_held": 440
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-03-11 16:39",
+      "exit_time": "2018-03-12 14:29",
+      "entry_price": "9,243.49",
+      "exit_price": "9,430.05",
+      "pnl_usd": "-186.56",
+      "pnl_bps": -202,
+      "bars_held": 1310
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-03-15 19:39",
+      "exit_time": "2018-03-16 01:24",
+      "entry_price": "8,274.10",
+      "exit_price": "8,009.99",
+      "pnl_usd": "+264.11",
+      "pnl_bps": 319,
+      "bars_held": 345
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-03-18 21:14",
+      "exit_time": "2018-03-19 13:49",
+      "entry_price": "7,953.45",
+      "exit_price": "8,535.00",
+      "pnl_usd": "-581.55",
+      "pnl_bps": -731,
+      "bars_held": 995
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-03-21 03:59",
+      "exit_time": "2018-03-21 16:19",
+      "entry_price": "9,042.23",
+      "exit_price": "8,888.00",
+      "pnl_usd": "+154.23",
+      "pnl_bps": 171,
+      "bars_held": 740
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2018-03-27 04:49",
+      "exit_time": "2018-03-27 13:54",
+      "entry_price": "7,771.99",
+      "exit_price": "8,072.24",
+      "pnl_usd": "+300.25",
+      "pnl_bps": 386,
+      "bars_held": 545
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-03-31 12:49",
+      "exit_time": "2018-03-31 20:24",
+      "entry_price": "7,189.91",
+      "exit_price": "6,956.36",
+      "pnl_usd": "+233.55",
+      "pnl_bps": 325,
+      "bars_held": 455
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-04-01 19:39",
+      "exit_time": "2018-04-02 20:19",
+      "entry_price": "6,943.48",
+      "exit_price": "6,920.91",
+      "pnl_usd": "+22.57",
+      "pnl_bps": 33,
+      "bars_held": 1480
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-04-12 11:19",
+      "exit_time": "2018-04-12 11:39",
+      "entry_price": "7,400.00",
+      "exit_price": "7,966.44",
+      "pnl_usd": "-566.44",
+      "pnl_bps": -765,
+      "bars_held": 20
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-04-13 11:29",
+      "exit_time": "2018-04-13 20:39",
+      "entry_price": "8,117.60",
+      "exit_price": "7,930.00",
+      "pnl_usd": "+187.60",
+      "pnl_bps": 231,
+      "bars_held": 550
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2018-05-16 02:24",
+      "exit_time": "2018-05-16 15:29",
+      "entry_price": "8,153.59",
+      "exit_price": "8,350.59",
+      "pnl_usd": "+197.00",
+      "pnl_bps": 242,
+      "bars_held": 785
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2018-05-23 16:09",
+      "exit_time": "2018-05-24 04:19",
+      "entry_price": "7,580.58",
+      "exit_price": "7,700.00",
+      "pnl_usd": "+119.42",
+      "pnl_bps": 158,
+      "bars_held": 730
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-06-25 14:29",
+      "exit_time": "2018-06-26 00:59",
+      "entry_price": "6,282.44",
+      "exit_price": "6,190.13",
+      "pnl_usd": "+92.31",
+      "pnl_bps": 147,
+      "bars_held": 630
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-06-30 01:34",
+      "exit_time": "2018-06-30 22:34",
+      "entry_price": "6,336.29",
+      "exit_price": "6,330.60",
+      "pnl_usd": "+5.69",
+      "pnl_bps": 9,
+      "bars_held": 1260
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-07-18 17:04",
+      "exit_time": "2018-07-18 18:49",
+      "entry_price": "7,439.33",
+      "exit_price": "7,420.91",
+      "pnl_usd": "+18.42",
+      "pnl_bps": 25,
+      "bars_held": 105
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2018-08-01 02:14",
+      "exit_time": "2018-08-01 22:29",
+      "entry_price": "7,530.00",
+      "exit_price": "7,604.04",
+      "pnl_usd": "+74.04",
+      "pnl_bps": 98,
+      "bars_held": 1215
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2018-08-04 17:29",
+      "exit_time": "2018-08-05 15:04",
+      "entry_price": "6,948.78",
+      "exit_price": "6,993.69",
+      "pnl_usd": "+44.91",
+      "pnl_bps": 65,
+      "bars_held": 1295
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2018-08-11 00:09",
+      "exit_time": "2018-08-11 17:19",
+      "entry_price": "6,134.92",
+      "exit_price": "6,382.46",
+      "pnl_usd": "+247.54",
+      "pnl_bps": 403,
+      "bars_held": 1030
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-08-22 02:04",
+      "exit_time": "2018-08-22 15:59",
+      "entry_price": "6,805.89",
+      "exit_price": "6,459.36",
+      "pnl_usd": "+346.53",
+      "pnl_bps": 509,
+      "bars_held": 835
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-11-28 04:39",
+      "exit_time": "2018-11-28 19:04",
+      "entry_price": "4,046.04",
+      "exit_price": "4,336.61",
+      "pnl_usd": "-290.57",
+      "pnl_bps": -718,
+      "bars_held": 865
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-11-29 09:34",
+      "exit_time": "2018-11-29 12:59",
+      "entry_price": "4,367.94",
+      "exit_price": "4,282.02",
+      "pnl_usd": "+85.92",
+      "pnl_bps": 197,
+      "bars_held": 205
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-12-08 00:59",
+      "exit_time": "2018-12-08 08:34",
+      "entry_price": "3,488.34",
+      "exit_price": "3,382.93",
+      "pnl_usd": "+105.41",
+      "pnl_bps": 302,
+      "bars_held": 455
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-12-09 13:44",
+      "exit_time": "2018-12-10 06:14",
+      "entry_price": "3,487.01",
+      "exit_price": "3,502.19",
+      "pnl_usd": "-15.18",
+      "pnl_bps": -44,
+      "bars_held": 990
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-12-17 18:49",
+      "exit_time": "2018-12-18 17:24",
+      "entry_price": "3,525.23",
+      "exit_price": "3,503.18",
+      "pnl_usd": "+22.05",
+      "pnl_bps": 63,
+      "bars_held": 1355
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-12-19 06:14",
+      "exit_time": "2018-12-19 13:34",
+      "entry_price": "3,742.12",
+      "exit_price": "3,880.88",
+      "pnl_usd": "-138.76",
+      "pnl_bps": -371,
+      "bars_held": 440
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-12-20 08:39",
+      "exit_time": "2018-12-20 20:49",
+      "entry_price": "3,944.66",
+      "exit_price": "3,874.33",
+      "pnl_usd": "+70.33",
+      "pnl_bps": 178,
+      "bars_held": 730
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2018-12-28 16:04",
+      "exit_time": "2018-12-29 15:44",
+      "entry_price": "3,833.61",
+      "exit_price": "3,821.37",
+      "pnl_usd": "+12.24",
+      "pnl_bps": 32,
+      "bars_held": 1420
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2019-02-08 16:54",
+      "exit_time": "2019-02-09 16:49",
+      "entry_price": "3,729.61",
+      "exit_price": "3,652.10",
+      "pnl_usd": "+77.51",
+      "pnl_bps": 208,
+      "bars_held": 1435
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-04-04 18:04",
+      "exit_time": "2019-04-05 00:04",
+      "entry_price": "4,862.20",
+      "exit_price": "4,923.54",
+      "pnl_usd": "+61.34",
+      "pnl_bps": 126,
+      "bars_held": 360
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-04-11 11:24",
+      "exit_time": "2019-04-12 09:49",
+      "entry_price": "4,972.00",
+      "exit_price": "4,984.03",
+      "pnl_usd": "+12.03",
+      "pnl_bps": 24,
+      "bars_held": 1345
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-05-12 15:19",
+      "exit_time": "2019-05-12 20:54",
+      "entry_price": "6,934.95",
+      "exit_price": "7,151.36",
+      "pnl_usd": "+216.41",
+      "pnl_bps": 312,
+      "bars_held": 335
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-05-14 19:29",
+      "exit_time": "2019-05-15 00:04",
+      "entry_price": "7,700.00",
+      "exit_price": "7,997.07",
+      "pnl_usd": "+297.07",
+      "pnl_bps": 386,
+      "bars_held": 275
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-05-17 02:54",
+      "exit_time": "2019-05-17 03:09",
+      "entry_price": "7,633.46",
+      "exit_price": "7,078.82",
+      "pnl_usd": "-554.64",
+      "pnl_bps": -727,
+      "bars_held": 15
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-05-20 13:09",
+      "exit_time": "2019-05-20 20:49",
+      "entry_price": "7,563.95",
+      "exit_price": "7,930.78",
+      "pnl_usd": "+366.83",
+      "pnl_bps": 485,
+      "bars_held": 460
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-05-30 21:19",
+      "exit_time": "2019-05-31 16:29",
+      "entry_price": "8,300.00",
+      "exit_price": "8,408.13",
+      "pnl_usd": "+108.13",
+      "pnl_bps": 130,
+      "bars_held": 1150
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-06-03 23:34",
+      "exit_time": "2019-06-04 17:19",
+      "entry_price": "8,121.08",
+      "exit_price": "7,818.20",
+      "pnl_usd": "-302.88",
+      "pnl_bps": -373,
+      "bars_held": 1065
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-06-29 06:04",
+      "exit_time": "2019-06-29 11:44",
+      "entry_price": "11,562.88",
+      "exit_price": "11,983.46",
+      "pnl_usd": "+420.58",
+      "pnl_bps": 364,
+      "bars_held": 340
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-06-30 13:54",
+      "exit_time": "2019-07-01 14:59",
+      "entry_price": "11,219.67",
+      "exit_price": "10,305.94",
+      "pnl_usd": "-913.73",
+      "pnl_bps": -814,
+      "bars_held": 1505
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-07-05 06:54",
+      "exit_time": "2019-07-05 14:29",
+      "entry_price": "10,887.09",
+      "exit_price": "11,351.16",
+      "pnl_usd": "+464.07",
+      "pnl_bps": 426,
+      "bars_held": 455
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-07-10 19:39",
+      "exit_time": "2019-07-11 04:29",
+      "entry_price": "11,976.26",
+      "exit_price": "11,278.77",
+      "pnl_usd": "-697.49",
+      "pnl_bps": -582,
+      "bars_held": 530
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-07-11 20:19",
+      "exit_time": "2019-07-12 05:44",
+      "entry_price": "11,349.77",
+      "exit_price": "11,406.72",
+      "pnl_usd": "+56.95",
+      "pnl_bps": 50,
+      "bars_held": 565
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-07-13 20:39",
+      "exit_time": "2019-07-13 22:24",
+      "entry_price": "10,900.33",
+      "exit_price": "11,359.09",
+      "pnl_usd": "+458.76",
+      "pnl_bps": 421,
+      "bars_held": 105
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-07-14 11:54",
+      "exit_time": "2019-07-15 00:29",
+      "entry_price": "10,630.00",
+      "exit_price": "9,933.04",
+      "pnl_usd": "-696.96",
+      "pnl_bps": -656,
+      "bars_held": 755
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-07-16 16:04",
+      "exit_time": "2019-07-16 21:04",
+      "entry_price": "10,167.42",
+      "exit_price": "9,499.82",
+      "pnl_usd": "-667.60",
+      "pnl_bps": -657,
+      "bars_held": 300
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-07-27 15:09",
+      "exit_time": "2019-07-28 10:39",
+      "entry_price": "9,408.03",
+      "exit_price": "9,459.63",
+      "pnl_usd": "+51.60",
+      "pnl_bps": 55,
+      "bars_held": 1170
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2019-08-06 21:34",
+      "exit_time": "2019-08-07 10:34",
+      "entry_price": "11,395.09",
+      "exit_price": "11,683.00",
+      "pnl_usd": "+287.91",
+      "pnl_bps": 253,
+      "bars_held": 780
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2019-09-03 13:24",
+      "exit_time": "2019-09-04 01:14",
+      "entry_price": "10,700.00",
+      "exit_price": "10,490.76",
+      "pnl_usd": "+209.24",
+      "pnl_bps": 196,
+      "bars_held": 710
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2019-10-01 03:04",
+      "exit_time": "2019-10-01 14:54",
+      "entry_price": "8,435.10",
+      "exit_price": "8,321.90",
+      "pnl_usd": "+113.20",
+      "pnl_bps": 134,
+      "bars_held": 710
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2019-10-27 16:19",
+      "exit_time": "2019-10-28 06:09",
+      "entry_price": "9,622.78",
+      "exit_price": "9,500.77",
+      "pnl_usd": "+122.01",
+      "pnl_bps": 127,
+      "bars_held": 830
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2019-11-25 12:29",
+      "exit_time": "2019-11-26 11:19",
+      "entry_price": "7,144.50",
+      "exit_price": "7,072.78",
+      "pnl_usd": "+71.72",
+      "pnl_bps": 100,
+      "bars_held": 1370
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2019-11-27 16:54",
+      "exit_time": "2019-11-28 22:34",
+      "entry_price": "7,456.77",
+      "exit_price": "7,516.67",
+      "pnl_usd": "-59.90",
+      "pnl_bps": -80,
+      "bars_held": 1780
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2019-12-18 20:14",
+      "exit_time": "2019-12-18 20:34",
+      "entry_price": "6,966.15",
+      "exit_price": "7,202.94",
+      "pnl_usd": "-236.79",
+      "pnl_bps": -340,
+      "bars_held": 20
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-01-08 00:59",
+      "exit_time": "2020-01-08 16:39",
+      "entry_price": "8,431.82",
+      "exit_price": "8,143.38",
+      "pnl_usd": "+288.44",
+      "pnl_bps": 342,
+      "bars_held": 940
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-02-19 21:49",
+      "exit_time": "2020-02-20 21:49",
+      "entry_price": "9,450.00",
+      "exit_price": "9,595.20",
+      "pnl_usd": "+145.20",
+      "pnl_bps": 154,
+      "bars_held": 1440
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-02-26 16:49",
+      "exit_time": "2020-02-27 12:19",
+      "entry_price": "8,666.14",
+      "exit_price": "8,926.53",
+      "pnl_usd": "+260.39",
+      "pnl_bps": 300,
+      "bars_held": 1170
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-03-15 12:19",
+      "exit_time": "2020-03-15 12:34",
+      "entry_price": "5,550.38",
+      "exit_price": "5,323.31",
+      "pnl_usd": "+227.07",
+      "pnl_bps": 409,
+      "bars_held": 15
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-03-19 09:24",
+      "exit_time": "2020-03-19 16:14",
+      "entry_price": "5,486.52",
+      "exit_price": "5,955.82",
+      "pnl_usd": "-469.30",
+      "pnl_bps": -855,
+      "bars_held": 410
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-03-21 21:04",
+      "exit_time": "2020-03-21 21:49",
+      "entry_price": "6,398.43",
+      "exit_price": "6,142.93",
+      "pnl_usd": "+255.50",
+      "pnl_bps": 399,
+      "bars_held": 45
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-03-23 12:19",
+      "exit_time": "2020-03-24 08:24",
+      "entry_price": "6,222.83",
+      "exit_price": "6,762.89",
+      "pnl_usd": "-540.06",
+      "pnl_bps": -868,
+      "bars_held": 1205
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-03-30 15:34",
+      "exit_time": "2020-03-31 10:04",
+      "entry_price": "6,417.11",
+      "exit_price": "6,413.18",
+      "pnl_usd": "+3.93",
+      "pnl_bps": 6,
+      "bars_held": 1110
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-04-02 00:04",
+      "exit_time": "2020-04-02 17:04",
+      "entry_price": "6,703.25",
+      "exit_price": "7,194.00",
+      "pnl_usd": "-490.75",
+      "pnl_bps": -732,
+      "bars_held": 1020
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-04-07 00:24",
+      "exit_time": "2020-04-07 14:54",
+      "entry_price": "7,428.76",
+      "exit_price": "7,267.58",
+      "pnl_usd": "+161.18",
+      "pnl_bps": 217,
+      "bars_held": 870
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-04-16 08:34",
+      "exit_time": "2020-04-17 08:49",
+      "entry_price": "7,087.95",
+      "exit_price": "7,049.24",
+      "pnl_usd": "+38.71",
+      "pnl_bps": 55,
+      "bars_held": 1455
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2020-04-23 21:54",
+      "exit_time": "2020-04-24 13:59",
+      "entry_price": "7,594.78",
+      "exit_price": "7,478.30",
+      "pnl_usd": "+116.48",
+      "pnl_bps": 153,
+      "bars_held": 965
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-04-30 16:44",
+      "exit_time": "2020-05-01 08:49",
+      "entry_price": "8,648.48",
+      "exit_price": "8,788.10",
+      "pnl_usd": "+139.62",
+      "pnl_bps": 161,
+      "bars_held": 965
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-05-11 18:09",
+      "exit_time": "2020-05-11 19:59",
+      "entry_price": "8,452.36",
+      "exit_price": "8,746.86",
+      "pnl_usd": "+294.50",
+      "pnl_bps": 348,
+      "bars_held": 110
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-05-21 14:44",
+      "exit_time": "2020-05-22 09:59",
+      "entry_price": "9,025.21",
+      "exit_price": "9,110.00",
+      "pnl_usd": "+84.79",
+      "pnl_bps": 94,
+      "bars_held": 1155
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-06-02 14:49",
+      "exit_time": "2020-06-03 14:49",
+      "entry_price": "9,533.22",
+      "exit_price": "9,563.76",
+      "pnl_usd": "+30.54",
+      "pnl_bps": 32,
+      "bars_held": 1440
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-06-11 16:59",
+      "exit_time": "2020-06-12 08:14",
+      "entry_price": "9,117.01",
+      "exit_price": "9,480.02",
+      "pnl_usd": "+363.01",
+      "pnl_bps": 398,
+      "bars_held": 915
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-08-02 04:39",
+      "exit_time": "2020-08-02 05:09",
+      "entry_price": "11,295.46",
+      "exit_price": "11,344.85",
+      "pnl_usd": "+49.39",
+      "pnl_bps": 44,
+      "bars_held": 30
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-09-03 15:39",
+      "exit_time": "2020-09-03 23:29",
+      "entry_price": "10,619.92",
+      "exit_price": "10,195.69",
+      "pnl_usd": "-424.23",
+      "pnl_bps": -399,
+      "bars_held": 470
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-09-04 14:44",
+      "exit_time": "2020-09-04 14:59",
+      "entry_price": "10,128.91",
+      "exit_price": "10,387.06",
+      "pnl_usd": "+258.15",
+      "pnl_bps": 255,
+      "bars_held": 15
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-11-07 20:04",
+      "exit_time": "2020-11-08 01:59",
+      "entry_price": "14,503.79",
+      "exit_price": "15,046.89",
+      "pnl_usd": "+543.10",
+      "pnl_bps": 374,
+      "bars_held": 355
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-12-01 13:04",
+      "exit_time": "2020-12-01 14:24",
+      "entry_price": "18,406.90",
+      "exit_price": "18,949.66",
+      "pnl_usd": "+542.76",
+      "pnl_bps": 295,
+      "bars_held": 80
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-12-02 04:34",
+      "exit_time": "2020-12-02 07:49",
+      "entry_price": "18,366.22",
+      "exit_price": "18,956.01",
+      "pnl_usd": "+589.79",
+      "pnl_bps": 321,
+      "bars_held": 195
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2020-12-27 20:49",
+      "exit_time": "2020-12-28 01:09",
+      "entry_price": "26,314.16",
+      "exit_price": "27,142.58",
+      "pnl_usd": "+828.42",
+      "pnl_bps": 315,
+      "bars_held": 260
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-04 07:24",
+      "exit_time": "2021-01-04 10:14",
+      "entry_price": "31,672.97",
+      "exit_price": "29,800.00",
+      "pnl_usd": "-1,872.97",
+      "pnl_bps": -591,
+      "bars_held": 170
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-09 06:24",
+      "exit_time": "2021-01-09 08:49",
+      "entry_price": "38,918.45",
+      "exit_price": "40,141.81",
+      "pnl_usd": "+1,223.36",
+      "pnl_bps": 314,
+      "bars_held": 145
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-10 17:24",
+      "exit_time": "2021-01-10 22:09",
+      "entry_price": "38,389.07",
+      "exit_price": "38,470.00",
+      "pnl_usd": "+80.93",
+      "pnl_bps": 21,
+      "bars_held": 285
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-15 14:39",
+      "exit_time": "2021-01-16 00:04",
+      "entry_price": "36,886.38",
+      "exit_price": "37,239.63",
+      "pnl_usd": "+353.25",
+      "pnl_bps": 96,
+      "bars_held": 565
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-17 07:34",
+      "exit_time": "2021-01-17 15:29",
+      "entry_price": "34,757.55",
+      "exit_price": "35,837.10",
+      "pnl_usd": "+1,079.55",
+      "pnl_bps": 311,
+      "bars_held": 475
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-20 04:19",
+      "exit_time": "2021-01-20 18:59",
+      "entry_price": "35,190.59",
+      "exit_price": "35,250.61",
+      "pnl_usd": "+60.02",
+      "pnl_bps": 17,
+      "bars_held": 880
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-21 09:14",
+      "exit_time": "2021-01-21 22:14",
+      "entry_price": "32,926.56",
+      "exit_price": "30,600.00",
+      "pnl_usd": "-2,326.56",
+      "pnl_bps": -707,
+      "bars_held": 780
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-25 22:14",
+      "exit_time": "2021-01-26 19:09",
+      "entry_price": "32,274.75",
+      "exit_price": "32,346.10",
+      "pnl_usd": "+71.35",
+      "pnl_bps": 22,
+      "bars_held": 1255
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-01-27 13:59",
+      "exit_time": "2021-01-27 20:19",
+      "entry_price": "30,275.30",
+      "exit_price": "31,362.76",
+      "pnl_usd": "+1,087.46",
+      "pnl_bps": 359,
+      "bars_held": 380
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-02-07 15:19",
+      "exit_time": "2021-02-07 22:54",
+      "entry_price": "37,709.16",
+      "exit_price": "38,783.74",
+      "pnl_usd": "+1,074.58",
+      "pnl_bps": 285,
+      "bars_held": 455
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-02-15 02:24",
+      "exit_time": "2021-02-15 08:54",
+      "entry_price": "46,170.84",
+      "exit_price": "47,654.00",
+      "pnl_usd": "+1,483.16",
+      "pnl_bps": 321,
+      "bars_held": 390
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-02-22 10:14",
+      "exit_time": "2021-02-22 14:09",
+      "entry_price": "54,245.34",
+      "exit_price": "51,700.00",
+      "pnl_usd": "-2,545.34",
+      "pnl_bps": -469,
+      "bars_held": 235
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-02-25 22:09",
+      "exit_time": "2021-02-26 16:09",
+      "entry_price": "47,700.00",
+      "exit_price": "47,942.20",
+      "pnl_usd": "+242.20",
+      "pnl_bps": 51,
+      "bars_held": 1080
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-02-28 03:54",
+      "exit_time": "2021-02-28 21:09",
+      "entry_price": "44,584.19",
+      "exit_price": "45,219.14",
+      "pnl_usd": "+634.95",
+      "pnl_bps": 142,
+      "bars_held": 1035
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-03-04 18:54",
+      "exit_time": "2021-03-05 14:24",
+      "entry_price": "47,748.14",
+      "exit_price": "48,582.47",
+      "pnl_usd": "+834.33",
+      "pnl_bps": 175,
+      "bars_held": 1170
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-03-15 09:24",
+      "exit_time": "2021-03-16 08:19",
+      "entry_price": "55,718.66",
+      "exit_price": "56,043.70",
+      "pnl_usd": "+325.04",
+      "pnl_bps": 58,
+      "bars_held": 1375
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-03-22 22:04",
+      "exit_time": "2021-03-23 13:19",
+      "entry_price": "53,840.18",
+      "exit_price": "55,336.75",
+      "pnl_usd": "+1,496.57",
+      "pnl_bps": 278,
+      "bars_held": 915
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-03-24 22:19",
+      "exit_time": "2021-03-25 20:19",
+      "entry_price": "52,105.00",
+      "exit_price": "52,555.05",
+      "pnl_usd": "+450.05",
+      "pnl_bps": 86,
+      "bars_held": 1320
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-04-22 21:09",
+      "exit_time": "2021-04-23 07:34",
+      "entry_price": "50,916.68",
+      "exit_price": "48,152.56",
+      "pnl_usd": "-2,764.12",
+      "pnl_bps": -543,
+      "bars_held": 625
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-04-30 16:04",
+      "exit_time": "2021-05-01 15:09",
+      "entry_price": "57,211.01",
+      "exit_price": "57,254.95",
+      "pnl_usd": "-43.94",
+      "pnl_bps": -8,
+      "bars_held": 1385
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-05-14 15:19",
+      "exit_time": "2021-05-14 20:29",
+      "entry_price": "51,340.46",
+      "exit_price": "49,736.55",
+      "pnl_usd": "+1,603.91",
+      "pnl_bps": 312,
+      "bars_held": 310
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-05-21 14:09",
+      "exit_time": "2021-05-21 14:19",
+      "entry_price": "41,630.94",
+      "exit_price": "38,961.61",
+      "pnl_usd": "+2,669.33",
+      "pnl_bps": 641,
+      "bars_held": 10
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-05-22 21:54",
+      "exit_time": "2021-05-23 00:04",
+      "entry_price": "38,324.97",
+      "exit_price": "36,824.59",
+      "pnl_usd": "+1,500.38",
+      "pnl_bps": 391,
+      "bars_held": 130
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-05-26 06:19",
+      "exit_time": "2021-05-26 13:59",
+      "entry_price": "39,732.18",
+      "exit_price": "38,831.98",
+      "pnl_usd": "+900.20",
+      "pnl_bps": 227,
+      "bars_held": 460
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-05-30 17:34",
+      "exit_time": "2021-05-31 01:34",
+      "entry_price": "35,870.17",
+      "exit_price": "34,893.37",
+      "pnl_usd": "+976.80",
+      "pnl_bps": 272,
+      "bars_held": 480
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-05-31 16:19",
+      "exit_time": "2021-06-01 07:34",
+      "entry_price": "37,417.97",
+      "exit_price": "36,650.35",
+      "pnl_usd": "+767.62",
+      "pnl_bps": 205,
+      "bars_held": 915
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-06-08 22:19",
+      "exit_time": "2021-06-09 15:04",
+      "entry_price": "33,600.22",
+      "exit_price": "35,897.63",
+      "pnl_usd": "-2,297.41",
+      "pnl_bps": -684,
+      "bars_held": 1005
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-06-10 07:19",
+      "exit_time": "2021-06-10 15:04",
+      "entry_price": "36,900.85",
+      "exit_price": "36,988.63",
+      "pnl_usd": "-87.78",
+      "pnl_bps": -24,
+      "bars_held": 465
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-06-13 20:04",
+      "exit_time": "2021-06-14 13:04",
+      "entry_price": "38,200.00",
+      "exit_price": "40,203.76",
+      "pnl_usd": "-2,003.76",
+      "pnl_bps": -525,
+      "bars_held": 1020
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-06-24 20:34",
+      "exit_time": "2021-06-25 07:19",
+      "entry_price": "34,710.00",
+      "exit_price": "34,088.67",
+      "pnl_usd": "+621.33",
+      "pnl_bps": 179,
+      "bars_held": 645
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-06-27 02:24",
+      "exit_time": "2021-06-28 07:44",
+      "entry_price": "33,024.17",
+      "exit_price": "35,140.47",
+      "pnl_usd": "-2,116.30",
+      "pnl_bps": -641,
+      "bars_held": 1760
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-07-21 16:39",
+      "exit_time": "2021-07-22 09:39",
+      "entry_price": "32,313.03",
+      "exit_price": "31,809.17",
+      "pnl_usd": "+503.86",
+      "pnl_bps": 156,
+      "bars_held": 1020
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-07-27 00:59",
+      "exit_time": "2021-07-27 13:39",
+      "entry_price": "37,443.00",
+      "exit_price": "38,724.28",
+      "pnl_usd": "+1,281.28",
+      "pnl_bps": 342,
+      "bars_held": 760
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-09-07 14:49",
+      "exit_time": "2021-09-07 15:09",
+      "entry_price": "48,675.33",
+      "exit_price": "43,088.74",
+      "pnl_usd": "-5,586.59",
+      "pnl_bps": -1148,
+      "bars_held": 20
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-09-20 07:39",
+      "exit_time": "2021-09-20 11:49",
+      "entry_price": "44,802.00",
+      "exit_price": "43,438.08",
+      "pnl_usd": "-1,363.92",
+      "pnl_bps": -304,
+      "bars_held": 250
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-09-21 20:49",
+      "exit_time": "2021-09-22 01:09",
+      "entry_price": "40,848.93",
+      "exit_price": "41,817.40",
+      "pnl_usd": "+968.47",
+      "pnl_bps": 237,
+      "bars_held": 260
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-09-24 11:14",
+      "exit_time": "2021-09-24 20:44",
+      "entry_price": "41,179.21",
+      "exit_price": "42,947.21",
+      "pnl_usd": "+1,768.00",
+      "pnl_bps": 429,
+      "bars_held": 570
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-10-02 03:09",
+      "exit_time": "2021-10-02 10:34",
+      "entry_price": "47,701.96",
+      "exit_price": "47,588.55",
+      "pnl_usd": "+113.41",
+      "pnl_bps": 24,
+      "bars_held": 445
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-10-27 08:09",
+      "exit_time": "2021-10-28 07:59",
+      "entry_price": "58,016.25",
+      "exit_price": "58,993.71",
+      "pnl_usd": "+977.46",
+      "pnl_bps": 168,
+      "bars_held": 1430
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-11-10 21:24",
+      "exit_time": "2021-11-11 19:49",
+      "entry_price": "62,947.71",
+      "exit_price": "65,042.39",
+      "pnl_usd": "+2,094.68",
+      "pnl_bps": 333,
+      "bars_held": 1345
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-11-16 01:14",
+      "exit_time": "2021-11-16 09:59",
+      "entry_price": "62,029.58",
+      "exit_price": "60,200.00",
+      "pnl_usd": "-1,829.58",
+      "pnl_bps": -295,
+      "bars_held": 525
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2021-11-27 00:04",
+      "exit_time": "2021-11-27 08:24",
+      "entry_price": "53,642.49",
+      "exit_price": "54,987.82",
+      "pnl_usd": "+1,345.33",
+      "pnl_bps": 251,
+      "bars_held": 500
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2021-12-05 05:29",
+      "exit_time": "2021-12-05 15:09",
+      "entry_price": "49,091.29",
+      "exit_price": "48,668.87",
+      "pnl_usd": "+422.42",
+      "pnl_bps": 86,
+      "bars_held": 580
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-01-24 18:14",
+      "exit_time": "2022-01-25 21:19",
+      "entry_price": "35,895.52",
+      "exit_price": "36,587.58",
+      "pnl_usd": "-692.06",
+      "pnl_bps": -193,
+      "bars_held": 1625
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-02-04 15:24",
+      "exit_time": "2022-02-04 19:59",
+      "entry_price": "39,407.98",
+      "exit_price": "40,727.91",
+      "pnl_usd": "-1,319.93",
+      "pnl_bps": -335,
+      "bars_held": 275
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-02-05 14:14",
+      "exit_time": "2022-02-05 17:14",
+      "entry_price": "41,431.76",
+      "exit_price": "41,026.62",
+      "pnl_usd": "+405.14",
+      "pnl_bps": 98,
+      "bars_held": 180
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-02-24 19:39",
+      "exit_time": "2022-02-24 20:14",
+      "entry_price": "37,107.56",
+      "exit_price": "38,827.43",
+      "pnl_usd": "-1,719.87",
+      "pnl_bps": -463,
+      "bars_held": 35
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-02-25 15:44",
+      "exit_time": "2022-02-25 20:04",
+      "entry_price": "39,348.82",
+      "exit_price": "38,673.86",
+      "pnl_usd": "+674.96",
+      "pnl_bps": 172,
+      "bars_held": 260
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-03-09 04:04",
+      "exit_time": "2022-03-10 02:09",
+      "entry_price": "41,515.24",
+      "exit_price": "40,744.99",
+      "pnl_usd": "+770.25",
+      "pnl_bps": 186,
+      "bars_held": 1325
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2022-04-11 19:29",
+      "exit_time": "2022-04-12 11:29",
+      "entry_price": "39,916.52",
+      "exit_price": "40,293.15",
+      "pnl_usd": "+376.63",
+      "pnl_bps": 94,
+      "bars_held": 960
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-05-11 13:49",
+      "exit_time": "2022-05-11 16:19",
+      "entry_price": "31,746.56",
+      "exit_price": "30,550.49",
+      "pnl_usd": "+1,196.07",
+      "pnl_bps": 377,
+      "bars_held": 150
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-05-13 10:49",
+      "exit_time": "2022-05-13 18:04",
+      "entry_price": "30,478.33",
+      "exit_price": "29,407.14",
+      "pnl_usd": "+1,071.19",
+      "pnl_bps": 351,
+      "bars_held": 435
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-05-30 21:24",
+      "exit_time": "2022-05-31 13:49",
+      "entry_price": "31,938.55",
+      "exit_price": "31,316.62",
+      "pnl_usd": "+621.93",
+      "pnl_bps": 195,
+      "bars_held": 985
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-06-15 22:04",
+      "exit_time": "2022-06-16 09:09",
+      "entry_price": "22,437.69",
+      "exit_price": "21,475.68",
+      "pnl_usd": "+962.01",
+      "pnl_bps": 429,
+      "bars_held": 665
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-06-19 09:34",
+      "exit_time": "2022-06-19 22:24",
+      "entry_price": "19,192.52",
+      "exit_price": "20,689.43",
+      "pnl_usd": "-1,496.91",
+      "pnl_bps": -780,
+      "bars_held": 770
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-06-20 10:39",
+      "exit_time": "2022-06-20 17:54",
+      "entry_price": "20,662.40",
+      "exit_price": "20,106.74",
+      "pnl_usd": "+555.66",
+      "pnl_bps": 269,
+      "bars_held": 435
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-06-21 14:49",
+      "exit_time": "2022-06-21 20:09",
+      "entry_price": "21,623.83",
+      "exit_price": "20,881.45",
+      "pnl_usd": "+742.38",
+      "pnl_bps": 343,
+      "bars_held": 320
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-07-01 00:29",
+      "exit_time": "2022-07-01 03:59",
+      "entry_price": "20,491.03",
+      "exit_price": "19,730.76",
+      "pnl_usd": "+760.27",
+      "pnl_bps": 371,
+      "bars_held": 210
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-07-08 01:29",
+      "exit_time": "2022-07-08 08:59",
+      "entry_price": "22,418.49",
+      "exit_price": "21,436.79",
+      "pnl_usd": "+981.70",
+      "pnl_bps": 438,
+      "bars_held": 450
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-07-18 15:59",
+      "exit_time": "2022-07-18 19:04",
+      "entry_price": "22,675.83",
+      "exit_price": "21,753.58",
+      "pnl_usd": "+922.25",
+      "pnl_bps": 407,
+      "bars_held": 185
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-07-19 16:34",
+      "exit_time": "2022-07-20 17:04",
+      "entry_price": "23,380.93",
+      "exit_price": "23,593.26",
+      "pnl_usd": "-212.33",
+      "pnl_bps": -91,
+      "bars_held": 1470
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-07-27 19:09",
+      "exit_time": "2022-07-28 15:29",
+      "entry_price": "22,711.67",
+      "exit_price": "23,494.18",
+      "pnl_usd": "-782.51",
+      "pnl_bps": -345,
+      "bars_held": 1220
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2022-08-19 06:39",
+      "exit_time": "2022-08-19 19:09",
+      "entry_price": "21,872.80",
+      "exit_price": "21,230.63",
+      "pnl_usd": "-642.17",
+      "pnl_bps": -294,
+      "bars_held": 750
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-09-09 06:34",
+      "exit_time": "2022-09-09 12:39",
+      "entry_price": "20,617.59",
+      "exit_price": "21,180.66",
+      "pnl_usd": "-563.07",
+      "pnl_bps": -273,
+      "bars_held": 365
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-09-10 01:09",
+      "exit_time": "2022-09-10 11:59",
+      "entry_price": "21,293.33",
+      "exit_price": "21,285.11",
+      "pnl_usd": "+8.22",
+      "pnl_bps": 4,
+      "bars_held": 650
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2022-10-14 01:59",
+      "exit_time": "2022-10-14 15:19",
+      "entry_price": "19,860.71",
+      "exit_price": "19,335.84",
+      "pnl_usd": "+524.87",
+      "pnl_bps": 264,
+      "bars_held": 800
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2023-03-14 21:04",
+      "exit_time": "2023-03-15 13:19",
+      "entry_price": "24,399.74",
+      "exit_price": "25,065.73",
+      "pnl_usd": "+665.99",
+      "pnl_bps": 273,
+      "bars_held": 975
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2023-04-26 19:49",
+      "exit_time": "2023-04-26 21:59",
+      "entry_price": "27,960.40",
+      "exit_price": "28,677.65",
+      "pnl_usd": "+717.25",
+      "pnl_bps": 257,
+      "bars_held": 130
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2023-12-11 18:14",
+      "exit_time": "2023-12-12 01:14",
+      "entry_price": "41,017.90",
+      "exit_price": "41,859.91",
+      "pnl_usd": "+842.01",
+      "pnl_bps": 205,
+      "bars_held": 420
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2024-01-12 16:54",
+      "exit_time": "2024-01-13 15:34",
+      "entry_price": "43,269.84",
+      "exit_price": "43,245.99",
+      "pnl_usd": "-23.85",
+      "pnl_bps": -6,
+      "bars_held": 1360
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2024-03-05 17:14",
+      "exit_time": "2024-03-05 23:44",
+      "entry_price": "64,199.99",
+      "exit_price": "64,099.60",
+      "pnl_usd": "-100.39",
+      "pnl_bps": -16,
+      "bars_held": 390
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2024-03-15 03:24",
+      "exit_time": "2024-03-15 18:44",
+      "entry_price": "67,964.40",
+      "exit_price": "69,259.97",
+      "pnl_usd": "+1,295.57",
+      "pnl_bps": 191,
+      "bars_held": 920
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2024-03-19 09:09",
+      "exit_time": "2024-03-19 17:04",
+      "entry_price": "63,193.00",
+      "exit_price": "65,301.78",
+      "pnl_usd": "+2,108.78",
+      "pnl_bps": 334,
+      "bars_held": 475
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2024-04-12 18:39",
+      "exit_time": "2024-04-13 13:19",
+      "entry_price": "66,064.00",
+      "exit_price": "67,764.00",
+      "pnl_usd": "+1,700.00",
+      "pnl_bps": 257,
+      "bars_held": 1120
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2024-05-04 10:59",
+      "exit_time": "2024-05-05 00:44",
+      "entry_price": "64,420.91",
+      "exit_price": "63,468.01",
+      "pnl_usd": "+952.90",
+      "pnl_bps": 148,
+      "bars_held": 825
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2024-08-06 13:39",
+      "exit_time": "2024-08-07 00:14",
+      "entry_price": "55,190.00",
+      "exit_price": "55,682.00",
+      "pnl_usd": "-492.00",
+      "pnl_bps": -89,
+      "bars_held": 635
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2024-08-08 16:04",
+      "exit_time": "2024-08-08 22:59",
+      "entry_price": "59,501.02",
+      "exit_price": "62,332.00",
+      "pnl_usd": "-2,830.98",
+      "pnl_bps": -476,
+      "bars_held": 415
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2024-08-27 22:19",
+      "exit_time": "2024-08-28 21:49",
+      "entry_price": "59,034.51",
+      "exit_price": "59,257.00",
+      "pnl_usd": "+222.49",
+      "pnl_bps": 38,
+      "bars_held": 1410
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2024-12-20 10:09",
+      "exit_time": "2024-12-20 15:24",
+      "entry_price": "94,555.74",
+      "exit_price": "96,799.99",
+      "pnl_usd": "+2,244.25",
+      "pnl_bps": 237,
+      "bars_held": 315
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-01-20 17:44",
+      "exit_time": "2025-01-21 12:19",
+      "entry_price": "100,786.25",
+      "exit_price": "104,700.43",
+      "pnl_usd": "+3,914.18",
+      "pnl_bps": 388,
+      "bars_held": 1115
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-02-03 18:54",
+      "exit_time": "2025-02-04 08:04",
+      "entry_price": "99,842.42",
+      "exit_price": "98,204.53",
+      "pnl_usd": "+1,637.89",
+      "pnl_bps": 164,
+      "bars_held": 790
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-01 02:54",
+      "exit_time": "2025-03-01 15:14",
+      "entry_price": "85,500.01",
+      "exit_price": "84,741.52",
+      "pnl_usd": "+758.49",
+      "pnl_bps": 89,
+      "bars_held": 740
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-02 17:34",
+      "exit_time": "2025-03-03 14:59",
+      "entry_price": "93,020.01",
+      "exit_price": "89,278.88",
+      "pnl_usd": "+3,741.13",
+      "pnl_bps": 402,
+      "bars_held": 1285
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-05 10:29",
+      "exit_time": "2025-03-06 12:49",
+      "entry_price": "89,612.02",
+      "exit_price": "89,843.60",
+      "pnl_usd": "-231.58",
+      "pnl_bps": -26,
+      "bars_held": 1580
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-04-09 17:34",
+      "exit_time": "2025-04-10 15:29",
+      "entry_price": "81,534.91",
+      "exit_price": "80,232.01",
+      "pnl_usd": "+1,302.90",
+      "pnl_bps": 160,
+      "bars_held": 1315
+    }
+  ],
+  "timestamp": "20260214T185855Z"
+}

@@ -1,7 +1,9 @@
 """Parameter Sweep — vary one param, recompile + run, show results table."""
 
 import asyncio
+import json
 import math
+import time
 import traceback
 from typing import Any, Dict, List, Optional
 
@@ -10,7 +12,8 @@ from nicegui import ui, run
 from ui.services.composition_store import load_composition
 from ui.services.research_services import (
     list_datasets,
-    run_sweep_for_composition,
+    run_single_sweep_step,
+    save_sweep_result,
     SweepResult,
 )
 
@@ -77,6 +80,134 @@ def _generate_centered_values(
     return unique
 
 
+def _build_candle_chart_html(values: list, default_value: float) -> str:
+    """Build the animated candlestick chart HTML/CSS/JS for sweep progress."""
+    candles = []
+    labels = []
+    for i, v in enumerate(values):
+        is_default = abs(v - default_value) < 0.001
+        candles.append(
+            f'<div class="sc-col" id="sc-{i}">'
+            f'  <div class="sc-upper">'
+            f'    <div class="sc-wick up-wick"></div>'
+            f'    <div class="sc-body up-body"></div>'
+            f'  </div>'
+            f'  <div class="sc-lower">'
+            f'    <div class="sc-body down-body"></div>'
+            f'    <div class="sc-wick down-wick"></div>'
+            f'  </div>'
+            f'</div>'
+        )
+        lbl_cls = "sc-lbl sc-lbl-def" if is_default else "sc-lbl"
+        lbl_text = f"[{v}]" if is_default else str(v)
+        labels.append(f'<div class="{lbl_cls}">{lbl_text}</div>')
+
+    return (
+        '<style>'
+        '.sc-wrap { margin-top: 8px; }'
+        '.sc-chart {'
+        '  height: 140px; display: flex; align-items: stretch; gap: 2px;'
+        '  position: relative; padding: 8px 4px;'
+        '  background: var(--bg-surface, #131a27);'
+        '  border: 1px solid var(--border, #1e293b);'
+        '  border-radius: 10px;'
+        '}'
+        '.sc-zero {'
+        '  position: absolute; top: 50%; left: 0; right: 0;'
+        '  height: 1px; background: #334155; z-index: 0;'
+        '}'
+        '.sc-col {'
+        '  flex: 1; display: flex; flex-direction: column;'
+        '  align-items: center; position: relative; z-index: 1; min-width: 16px;'
+        '}'
+        '.sc-upper {'
+        '  height: 50%; display: flex; flex-direction: column;'
+        '  justify-content: flex-end; align-items: center;'
+        '}'
+        '.sc-lower {'
+        '  height: 50%; display: flex; flex-direction: column;'
+        '  justify-content: flex-start; align-items: center;'
+        '}'
+        '.sc-wick {'
+        '  width: 2px; height: 0; border-radius: 1px;'
+        '  transition: height 0.5s cubic-bezier(0.4,0,0.2,1),'
+        '             background-color 0.3s;'
+        '}'
+        '.sc-body {'
+        '  width: 14px; height: 0; border-radius: 2px;'
+        '  transition: height 0.5s cubic-bezier(0.4,0,0.2,1),'
+        '             background-color 0.3s;'
+        '}'
+        '.sc-forming .up-body {'
+        '  background: #3b82f6; height: 16px;'
+        '  animation: sc-pulse 1.2s ease-in-out infinite;'
+        '  transform-origin: bottom;'
+        '}'
+        '@keyframes sc-pulse {'
+        '  0%, 100% { opacity: 0.3; transform: scaleY(0.5); }'
+        '  50% { opacity: 0.85; transform: scaleY(1.3); }'
+        '}'
+        '.sc-labels {'
+        '  display: flex; gap: 2px; padding: 2px 4px;'
+        '}'
+        '.sc-lbl {'
+        '  flex: 1; text-align: center; font-size: 10px; min-width: 16px;'
+        '  color: #64748b; font-family: "JetBrains Mono", monospace;'
+        '}'
+        '.sc-lbl-def { color: #3b82f6; font-weight: 700; }'
+        '</style>'
+        '<div class="sc-wrap">'
+        '  <div class="sc-chart">'
+        '    <div class="sc-zero"></div>'
+        f'   {"".join(candles)}'
+        '  </div>'
+        f' <div class="sc-labels">{"".join(labels)}</div>'
+        '</div>'
+    )
+
+
+# JS functions injected via ui.run_javascript (ui.html rejects <script> tags)
+_CANDLE_JS = (
+    'window.scSetForming = function(idx) {'
+    '  var c = document.getElementById("sc-" + idx);'
+    '  if (c) c.classList.add("sc-forming");'
+    '};'
+    'window.scUpdate = function(results) {'
+    '  if (!results || results.length === 0) return;'
+    '  var maxAbs = 1;'
+    '  for (var i = 0; i < results.length; i++) {'
+    '    var a = Math.abs(results[i].e);'
+    '    if (a > maxAbs) maxAbs = a;'
+    '  }'
+    '  var maxH = 50;'
+    '  for (var i = 0; i < results.length; i++) {'
+    '    var r = results[i];'
+    '    var col = document.getElementById("sc-" + r.i);'
+    '    if (!col) continue;'
+    '    col.classList.remove("sc-forming");'
+    '    var bu = col.querySelector(".up-body");'
+    '    var wu = col.querySelector(".up-wick");'
+    '    var bd = col.querySelector(".down-body");'
+    '    var wd = col.querySelector(".down-wick");'
+    '    var h = Math.max(3, Math.round(Math.abs(r.e) / maxAbs * maxH));'
+    '    var wUp = Math.round(r.w * 12);'
+    '    var wDn = Math.round((1 - r.w) * 8);'
+    '    var clr = r.e >= 0 ? "#10b981" : "#ef4444";'
+    '    if (r.err) clr = "#475569";'
+    '    if (r.e >= 0) {'
+    '      bu.style.height = h + "px"; bu.style.background = clr;'
+    '      wu.style.height = wUp + "px"; wu.style.background = clr;'
+    '      bd.style.height = "0"; wd.style.height = "0";'
+    '    } else {'
+    '      bu.style.height = "0"; wu.style.height = "0";'
+    '      bd.style.height = h + "px"; bd.style.background = clr;'
+    '      wd.style.height = wDn + "px"; wd.style.background = clr;'
+    '    }'
+    '  }'
+    '};'
+)
+
+
 def _extract_sweepable_params(spec: dict) -> List[dict]:
     """Auto-extract sweepable parameters from indicator_instances.
 
@@ -93,7 +224,11 @@ def _extract_sweepable_params(spec: dict) -> List[dict]:
                 continue
             # Heuristic bounds: period-like params stay >= 2, others >= 0
             is_period = "period" in pname.lower()
-            default = pval
+            # Convert integer-valued floats to int (JSON deserialises 14 → 14.0)
+            if isinstance(pval, float) and pval == int(pval):
+                default = int(pval)
+            else:
+                default = pval
             if is_period:
                 lo = max(2, int(default * 0.5))
                 hi = int(math.ceil(default * 2.5))
@@ -199,8 +334,8 @@ def parameter_sweep_page(composition_id: str):
                     formatted.append(str(v))
             preview_label.text = f"Sweep values: {', '.join(formatted)}"
 
-        param_select.on("change", _update_preview)
-        n_steps.on("change", _update_preview)
+        param_select.on("update:model-value", _update_preview)
+        n_steps.on("update:model-value", _update_preview)
         _update_preview()
 
         # Results container
@@ -240,24 +375,67 @@ def parameter_sweep_page(composition_id: str):
                     is_integer=isinstance(p_default, int),
                 )
 
-                ui.notify(
-                    f"Sweeping {param_select.value}: {len(sweep_values)} values centered on {p_default}",
-                    type="info")
+                param_short = param_select.value.rsplit(".", 1)[-1]
 
-                sweep_result = await run.cpu_bound(
-                    run_sweep_for_composition,
-                    spec=spec,
-                    param_name=param_select.value,
-                    param_min=p_min,
-                    param_max=p_max,
-                    n_steps=steps,
-                    dataset_path=dataset_path,
-                    default_value=p_default,
-                    param_values=sweep_values,
-                )
-
+                # Set up candle chart + progress label
                 results_container.clear()
                 with results_container:
+                    ui.html(_build_candle_chart_html(sweep_values, p_default))
+                    progress_label = ui.label("Preparing...").classes(
+                        "text-sm text-gray-400 mt-2 monospace")
+
+                # Inject candle chart JS functions (ui.html rejects <script> tags)
+                await ui.run_javascript(_CANDLE_JS)
+
+                t0 = time.time()
+                completed: List[dict] = []
+
+                for step_idx, val in enumerate(sweep_values):
+                    # Set current candle as forming (pulsing blue)
+                    await ui.run_javascript(f"scSetForming({step_idx})")
+                    pct = step_idx * 100 // len(sweep_values)
+                    progress_label.text = (
+                        f"Step {step_idx + 1}/{len(sweep_values)} ({pct}%)"
+                        f" \u2014 testing {param_short}={val}")
+
+                    # Run single step in subprocess
+                    step_result = await run.cpu_bound(
+                        run_single_sweep_step,
+                        spec=spec,
+                        param_name=param_select.value,
+                        value=val,
+                        dataset_path=dataset_path,
+                        default_value=p_default,
+                    )
+                    completed.append(step_result)
+
+                    # Rescale all completed candles
+                    candle_data = json.dumps([
+                        {"i": i, "e": r["expectancy_bps"],
+                         "w": r.get("win_rate", 0),
+                         "err": "error" in r}
+                        for i, r in enumerate(completed)
+                    ])
+                    await ui.run_javascript(f"scUpdate({candle_data})")
+
+                elapsed = time.time() - t0
+                progress_label.text = (
+                    f"Sweep complete \u2014 {len(sweep_values)} steps"
+                    f" in {elapsed:.1f}s")
+
+                # Save results
+                comp_id = spec.get("composition_id", "unknown")
+                saved_path = save_sweep_result(
+                    comp_id, param_select.value, completed)
+
+                # Build SweepResult for table rendering
+                sweep_result = SweepResult()
+                sweep_result.param_name = param_select.value
+                sweep_result.results = completed
+                sweep_result.saved_path = saved_path
+
+                with results_container:
+                    ui.separator().classes("my-2")
                     _render_sweep_results(param_select.value, sweep_result)
 
                 ui.notify("Sweep complete", type="positive")

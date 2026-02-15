@@ -1,0 +1,331 @@
+{
+  "strategy_config_hash": "sha256:39ee45a4811112739b0aec81ecdfacca6c7f5d832fb3e53be3a6ac45b10603c3",
+  "dataset_prefix": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31",
+  "dataset_filename": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
+  "runner_economics": {
+    "fee_rate": 0.0006,
+    "slippage_bps": 10,
+    "starting_capital": 10000
+  },
+  "trade_count": 19,
+  "bar_count": 570241,
+  "triage_v2": {
+    "test_results": [
+      {
+        "name": "1: Expectancy + PF",
+        "status": "PASS",
+        "detail": "Expectancy: +158.8 bps/trade | PF: 5.27 (elite) | Win rate: 84.2%",
+        "metrics": {
+          "expectancy_bps": 158.79,
+          "profit_factor": "5.27",
+          "profit_factor_label": "elite",
+          "win_rate": 84.21,
+          "avg_win_bps": 232.69,
+          "avg_loss_bps": 235.33,
+          "total_pnl_bps": 3017
+        }
+      },
+      {
+        "name": "2: Profit Concentration",
+        "status": "PASS",
+        "detail": "PnL still positive after removing top 1 trade(s): +2623 bps (was +3017 bps)",
+        "metrics": {
+          "total_pnl_bps": 3017,
+          "trades_removed": 1,
+          "remaining_pnl_bps": 2623,
+          "pnl_drop_pct": 13.1
+        }
+      },
+      {
+        "name": "3: Temporal Consistency",
+        "status": "PASS",
+        "detail": "All 2 windows within 15pp of overall 84% win rate (worst: 80%, drop: 4pp)",
+        "metrics": {
+          "overall_win_rate": 84.21,
+          "window_size": 10,
+          "num_windows": 2,
+          "worst_window_wr": 80.0,
+          "max_drop_pp": 4.2
+        }
+      },
+      {
+        "name": "4: Drawdown",
+        "status": "PASS",
+        "detail": "Max DD: 3.7% | Max consecutive losses: 1 (375 bps)",
+        "metrics": {
+          "max_drawdown_pct": 3.75,
+          "max_drawdown_dollar": 507.11,
+          "max_consecutive_losses": 1,
+          "worst_consecutive_loss_bps": 375.0,
+          "final_equity": 13436.77
+        }
+      },
+      {
+        "name": "5: OOS Holdout",
+        "status": "INSUFFICIENT DATA",
+        "detail": "Only 4 OOS trades (need 10). Manual approval required for shadow promotion.",
+        "metrics": {
+          "train_trades": 15,
+          "oos_trades": 4,
+          "split_bar_idx": 456192,
+          "oos_sharpe": null,
+          "train_sharpe": 1.094190797271548
+        }
+      },
+      {
+        "name": "6: Cost Ramp",
+        "status": "PASS",
+        "detail": "R\u00b2: NOT EVALUATED (< 50 trades) | Breakeven: 190 bps (6.1x operating) | WR@100bps: 74% (PASS)",
+        "metrics": {
+          "breakeven_cost_bps": 189.8,
+          "breakeven_headroom_ratio": 6.12,
+          "r_squared": null,
+          "r_squared_status": "NOT EVALUATED",
+          "win_rate_at_100bps": 73.7
+        }
+      }
+    ],
+    "tier": "S",
+    "tier_action": "Manual approval required (OOS insufficient data + LOW CONFIDENCE)",
+    "flags": [
+      "LOW CONFIDENCE \u2014 Wilson 95% LB: 62.4%"
+    ],
+    "warnings": [],
+    "metrics": {
+      "trade_count": 19,
+      "win_rate": 84.21,
+      "expectancy_bps": 158.79,
+      "profit_factor": "5.27",
+      "total_pnl_bps": 3017,
+      "breakeven_cost_bps": 189.8,
+      "wilson_lb": 62.43,
+      "max_drawdown_pct": 3.75,
+      "max_consecutive_losses": 1,
+      "worst_consecutive_loss_bps": 375.0
+    },
+    "cost_ramp_table": [
+      {
+        "cost_bps": 25,
+        "win_rate": 84.2,
+        "sharpe": 0.7839,
+        "total_pnl_bps": 3131,
+        "profit_factor": "5.55"
+      },
+      {
+        "cost_bps": 50,
+        "win_rate": 84.2,
+        "sharpe": 0.665,
+        "total_pnl_bps": 2656,
+        "profit_factor": "4.48"
+      },
+      {
+        "cost_bps": 100,
+        "win_rate": 73.7,
+        "sharpe": 0.4271,
+        "total_pnl_bps": 1706,
+        "profit_factor": "2.82"
+      },
+      {
+        "cost_bps": 200,
+        "win_rate": 57.9,
+        "sharpe": -0.0486,
+        "total_pnl_bps": -194,
+        "profit_factor": "0.88"
+      }
+    ],
+    "tier_reasoning": "Base win rate: 84.2% (S)\nWilson 95% LB: 62.4% (B) \u2014 LOW CONFIDENCE\nCost ramp modifier: PASS (7370% at 100bps, floor 0.6)\nTest overrides: None\nOOS status: INSUFFICIENT DATA (4 OOS trades)"
+  },
+  "trade_details": [
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-01-20 07:04",
+      "exit_time": "2025-01-20 16:14",
+      "entry_price": "108,613.65",
+      "exit_price": "104,513.09",
+      "pnl_usd": "+4,100.56",
+      "pnl_bps": 378,
+      "bars_held": 550
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-01-21 05:14",
+      "exit_time": "2025-01-21 12:19",
+      "entry_price": "102,000.01",
+      "exit_price": "104,700.43",
+      "pnl_usd": "+2,700.42",
+      "pnl_bps": 265,
+      "bars_held": 425
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-02-03 01:49",
+      "exit_time": "2025-02-03 09:04",
+      "entry_price": "93,359.99",
+      "exit_price": "95,650.00",
+      "pnl_usd": "+2,290.01",
+      "pnl_bps": 245,
+      "bars_held": 435
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-02-03 21:04",
+      "exit_time": "2025-02-04 08:04",
+      "entry_price": "101,131.76",
+      "exit_price": "98,204.53",
+      "pnl_usd": "+2,927.23",
+      "pnl_bps": 289,
+      "bars_held": 660
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-02-25 07:39",
+      "exit_time": "2025-02-25 15:14",
+      "entry_price": "88,992.01",
+      "exit_price": "86,828.15",
+      "pnl_usd": "-2,163.86",
+      "pnl_bps": -243,
+      "bars_held": 455
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-02-26 20:19",
+      "exit_time": "2025-02-27 05:54",
+      "entry_price": "82,330.31",
+      "exit_price": "85,828.90",
+      "pnl_usd": "+3,498.59",
+      "pnl_bps": 425,
+      "bars_held": 575
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-02-28 02:34",
+      "exit_time": "2025-02-28 14:44",
+      "entry_price": "80,311.95",
+      "exit_price": "82,332.80",
+      "pnl_usd": "+2,020.85",
+      "pnl_bps": 252,
+      "bars_held": 730
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-01 02:54",
+      "exit_time": "2025-03-01 15:14",
+      "entry_price": "85,500.01",
+      "exit_price": "84,741.52",
+      "pnl_usd": "+758.49",
+      "pnl_bps": 89,
+      "bars_held": 740
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-02 17:34",
+      "exit_time": "2025-03-03 14:59",
+      "entry_price": "93,020.01",
+      "exit_price": "89,278.88",
+      "pnl_usd": "+3,741.13",
+      "pnl_bps": 402,
+      "bars_held": 1285
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-05 10:29",
+      "exit_time": "2025-03-06 12:49",
+      "entry_price": "89,612.02",
+      "exit_price": "89,843.60",
+      "pnl_usd": "-231.58",
+      "pnl_bps": -26,
+      "bars_held": 1580
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-03-07 00:49",
+      "exit_time": "2025-03-07 07:09",
+      "entry_price": "85,524.28",
+      "exit_price": "88,447.90",
+      "pnl_usd": "+2,923.62",
+      "pnl_bps": 342,
+      "bars_held": 380
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-03-11 00:29",
+      "exit_time": "2025-03-11 06:09",
+      "entry_price": "77,309.01",
+      "exit_price": "80,426.23",
+      "pnl_usd": "+3,117.22",
+      "pnl_bps": 403,
+      "bars_held": 340
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-04-03 14:54",
+      "exit_time": "2025-04-03 22:04",
+      "entry_price": "81,584.02",
+      "exit_price": "82,800.09",
+      "pnl_usd": "+1,216.07",
+      "pnl_bps": 149,
+      "bars_held": 430
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-04-07 04:39",
+      "exit_time": "2025-04-07 14:14",
+      "entry_price": "76,878.49",
+      "exit_price": "79,564.86",
+      "pnl_usd": "+2,686.37",
+      "pnl_bps": 349,
+      "bars_held": 575
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-04-09 17:34",
+      "exit_time": "2025-04-10 15:29",
+      "entry_price": "81,534.91",
+      "exit_price": "80,232.01",
+      "pnl_usd": "+1,302.90",
+      "pnl_bps": 160,
+      "bars_held": 1315
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-11-14 12:34",
+      "exit_time": "2025-11-15 04:49",
+      "entry_price": "95,214.12",
+      "exit_price": "96,050.73",
+      "pnl_usd": "+836.61",
+      "pnl_bps": 88,
+      "bars_held": 975
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-11-21 02:54",
+      "exit_time": "2025-11-21 09:34",
+      "entry_price": "85,835.00",
+      "exit_price": "82,880.03",
+      "pnl_usd": "-2,954.97",
+      "pnl_bps": -344,
+      "bars_held": 400
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-12-01 15:34",
+      "exit_time": "2025-12-02 00:24",
+      "entry_price": "84,428.34",
+      "exit_price": "86,272.52",
+      "pnl_usd": "+1,844.18",
+      "pnl_bps": 218,
+      "bars_held": 530
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2026-01-30 01:44",
+      "exit_time": "2026-01-30 16:44",
+      "entry_price": "82,035.92",
+      "exit_price": "83,390.52",
+      "pnl_usd": "+1,354.60",
+      "pnl_bps": 165,
+      "bars_held": 900
+    }
+  ],
+  "timestamp": "20260214T182032Z"
+}

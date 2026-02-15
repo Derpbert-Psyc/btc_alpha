@@ -1,0 +1,97 @@
+{
+  "composition_id": "996955a0-8dfc-443d-a744-ed7e9eef4fb9",
+  "param_name": "adx_1d_p14_gate.period",
+  "timestamp": "20260214T175146Z",
+  "results": [
+    {
+      "param_value": 7,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:5514656b5",
+      "is_default": false
+    },
+    {
+      "param_value": 10,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:b42c3cf11",
+      "is_default": false
+    },
+    {
+      "param_value": 13,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:769bb8c0d",
+      "is_default": false
+    },
+    {
+      "param_value": 16,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:96252b0f6",
+      "is_default": false
+    },
+    {
+      "param_value": 19,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:05db866bd",
+      "is_default": false
+    },
+    {
+      "param_value": 22,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:d2e9cf7a1",
+      "is_default": false
+    },
+    {
+      "param_value": 25,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:596b9ed7f",
+      "is_default": false
+    },
+    {
+      "param_value": 28,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:de5dea4ff",
+      "is_default": false
+    },
+    {
+      "param_value": 31,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:9b034776f",
+      "is_default": false
+    },
+    {
+      "param_value": 34,
+      "expectancy_bps": 0.0,
+      "win_rate": 0.0,
+      "passed": false,
+      "trades": 0,
+      "hash": "sha256:d8fd24e89",
+      "is_default": false
+    }
+  ]
+}

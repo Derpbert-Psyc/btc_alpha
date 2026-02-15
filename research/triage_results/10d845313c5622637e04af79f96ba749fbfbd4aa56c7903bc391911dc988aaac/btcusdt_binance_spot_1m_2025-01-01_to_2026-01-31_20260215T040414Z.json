@@ -1,0 +1,241 @@
+{
+  "strategy_config_hash": "sha256:10d845313c5622637e04af79f96ba749fbfbd4aa56c7903bc391911dc988aaac",
+  "dataset_prefix": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31",
+  "dataset_filename": "btcusdt_binance_spot_1m_2025-01-01_to_2026-01-31.parquet",
+  "runner_economics": {
+    "fee_rate": 0.0006,
+    "slippage_bps": 10,
+    "starting_capital": 10000
+  },
+  "trade_count": 10,
+  "bar_count": 570241,
+  "triage_v2": {
+    "test_results": [
+      {
+        "name": "1: Expectancy + PF",
+        "status": "FAIL",
+        "detail": "Negative expectancy: -87.1 bps/trade | PF: 0.54",
+        "metrics": {
+          "expectancy_bps": -87.1,
+          "profit_factor": "0.54",
+          "profit_factor_label": "negative",
+          "win_rate": 50.0,
+          "avg_win_bps": 200.6,
+          "avg_loss_bps": 374.8,
+          "total_pnl_bps": -871
+        }
+      },
+      {
+        "name": "2: Profit Concentration",
+        "status": "FAIL",
+        "detail": "Removing top 1 trade(s) flips PnL negative: -1228 bps (was -871 bps)",
+        "metrics": {
+          "total_pnl_bps": -871,
+          "trades_removed": 1,
+          "remaining_pnl_bps": -1228,
+          "pnl_drop_pct": 0
+        }
+      },
+      {
+        "name": "3: Temporal Consistency",
+        "status": "PASS",
+        "detail": "All 1 windows within 15pp of overall 50% win rate (worst: 50%, drop: 0pp)",
+        "metrics": {
+          "overall_win_rate": 50.0,
+          "window_size": 10,
+          "num_windows": 1,
+          "worst_window_wr": 50.0,
+          "max_drop_pp": 0.0
+        }
+      },
+      {
+        "name": "4: Drawdown",
+        "status": "PASS",
+        "detail": "Max DD: 9.7% | Max consecutive losses: 2 (932 bps)",
+        "metrics": {
+          "max_drawdown_pct": 9.68,
+          "max_drawdown_dollar": 975.16,
+          "max_consecutive_losses": 2,
+          "worst_consecutive_loss_bps": 932.0,
+          "final_equity": 9099.1
+        }
+      },
+      {
+        "name": "5: OOS Holdout",
+        "status": "INSUFFICIENT DATA",
+        "detail": "Only 0 OOS trades (need 10). Manual approval required for shadow promotion.",
+        "metrics": {
+          "train_trades": 10,
+          "oos_trades": 0,
+          "split_bar_idx": 456192,
+          "oos_sharpe": null,
+          "train_sharpe": -0.22672070129756916
+        }
+      },
+      {
+        "name": "6: Cost Ramp",
+        "status": "FAIL",
+        "detail": "R\u00b2: NOT EVALUATED (< 50 trades) | Breakeven: 0 bps (0.0x operating, FAIL) | WR@100bps: 40% (FAIL)",
+        "metrics": {
+          "breakeven_cost_bps": 0.0,
+          "breakeven_headroom_ratio": 0.0,
+          "r_squared": null,
+          "r_squared_status": "NOT EVALUATED",
+          "win_rate_at_100bps": 40.0
+        }
+      }
+    ],
+    "tier": "F",
+    "tier_action": "Discard. No viable edge.",
+    "flags": [
+      "LOW CONFIDENCE \u2014 Wilson 95% LB: 23.7%"
+    ],
+    "warnings": [],
+    "metrics": {
+      "trade_count": 10,
+      "win_rate": 50.0,
+      "expectancy_bps": -87.1,
+      "profit_factor": "0.54",
+      "total_pnl_bps": -871,
+      "breakeven_cost_bps": 0.0,
+      "wilson_lb": 23.66,
+      "max_drawdown_pct": 9.68,
+      "max_consecutive_losses": 2,
+      "worst_consecutive_loss_bps": 932.0
+    },
+    "cost_ramp_table": [
+      {
+        "cost_bps": 25,
+        "win_rate": 50.0,
+        "sharpe": -0.2111,
+        "total_pnl_bps": -811,
+        "profit_factor": "0.56"
+      },
+      {
+        "cost_bps": 50,
+        "win_rate": 50.0,
+        "sharpe": -0.2762,
+        "total_pnl_bps": -1061,
+        "profit_factor": "0.46"
+      },
+      {
+        "cost_bps": 100,
+        "win_rate": 40.0,
+        "sharpe": -0.4063,
+        "total_pnl_bps": -1561,
+        "profit_factor": "0.30"
+      },
+      {
+        "cost_bps": 200,
+        "win_rate": 30.0,
+        "sharpe": -0.6666,
+        "total_pnl_bps": -2561,
+        "profit_factor": "0.13"
+      }
+    ],
+    "tier_reasoning": "Base win rate: 50.0% (C)\nWilson 95% LB: 23.7% (F) \u2014 LOW CONFIDENCE\nCost ramp modifier: PASS (4000% at 100bps, floor N/A)\nTest overrides: Test 1 FAIL (negative expectancy) \u2192 F; Test 2 FAIL (profit concentration) \u2192 max C\nOOS status: INSUFFICIENT DATA (0 OOS trades)"
+  },
+  "trade_details": [
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-01-14 09:49",
+      "exit_time": "2025-01-15 15:04",
+      "entry_price": "97,219.21",
+      "exit_price": "99,568.38",
+      "pnl_usd": "-2,349.17",
+      "pnl_bps": -242,
+      "bars_held": 1755
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-01-20 17:44",
+      "exit_time": "2025-01-21 12:19",
+      "entry_price": "100,786.25",
+      "exit_price": "104,700.43",
+      "pnl_usd": "+3,914.18",
+      "pnl_bps": 388,
+      "bars_held": 1115
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-02-03 15:24",
+      "exit_time": "2025-02-03 19:44",
+      "entry_price": "97,900.02",
+      "exit_price": "101,237.99",
+      "pnl_usd": "-3,337.97",
+      "pnl_bps": -341,
+      "bars_held": 260
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-02-28 16:34",
+      "exit_time": "2025-03-01 15:14",
+      "entry_price": "83,879.39",
+      "exit_price": "84,741.52",
+      "pnl_usd": "-862.13",
+      "pnl_bps": -103,
+      "bars_held": 1360
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-02 17:19",
+      "exit_time": "2025-03-03 14:59",
+      "entry_price": "92,461.66",
+      "exit_price": "89,278.88",
+      "pnl_usd": "+3,182.78",
+      "pnl_bps": 344,
+      "bars_held": 1300
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-04 20:24",
+      "exit_time": "2025-03-06 12:49",
+      "entry_price": "88,672.85",
+      "exit_price": "89,843.60",
+      "pnl_usd": "-1,170.75",
+      "pnl_bps": -132,
+      "bars_held": 2425
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-03-11 18:54",
+      "exit_time": "2025-03-12 06:54",
+      "entry_price": "83,349.31",
+      "exit_price": "81,331.21",
+      "pnl_usd": "+2,018.10",
+      "pnl_bps": 242,
+      "bars_held": 720
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-04-07 22:44",
+      "exit_time": "2025-04-08 14:49",
+      "entry_price": "79,948.93",
+      "exit_price": "79,061.90",
+      "pnl_usd": "+887.03",
+      "pnl_bps": 111,
+      "bars_held": 965
+    },
+    {
+      "direction": "SHORT",
+      "entry_time": "2025-04-09 17:29",
+      "exit_time": "2025-04-10 15:29",
+      "entry_price": "80,820.66",
+      "exit_price": "80,232.01",
+      "pnl_usd": "+588.65",
+      "pnl_bps": 73,
+      "bars_held": 1320
+    },
+    {
+      "direction": "LONG",
+      "entry_time": "2025-10-10 20:59",
+      "exit_time": "2025-10-10 21:19",
+      "entry_price": "114,266.82",
+      "exit_price": "103,975.26",
+      "pnl_usd": "-10,291.56",
+      "pnl_bps": -901,
+      "bars_held": 20
+    }
+  ],
+  "timestamp": "20260215T040414Z"
+}

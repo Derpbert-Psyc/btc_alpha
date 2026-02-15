@@ -23,34 +23,37 @@ ROLES = ["trigger", "filter", "price", "sizing", "gate", "diagnostic"]
 
 def _generate_auto_label(name: str, indicator_id: int, tf: str, params: dict) -> str:
     """Generate auto-label based on indicator-specific patterns."""
+    def _ip(key, default):
+        """Get integer period — prevents float decimals in labels."""
+        v = params.get(key, default)
+        return int(v) if isinstance(v, (int, float)) else v
+
     n = name.lower()
     if n == "ema":
-        period = params.get("period", 20)
-        if isinstance(period, (int, float)):
-            period = int(period)
+        period = _ip("period", 20)
         if period == 1:
             return f"price_{tf}"
         return f"ema_{tf}_p{period}"
     if n == "rsi":
-        return f"rsi_{tf}_p{params.get('period', 14)}"
+        return f"rsi_{tf}_p{_ip('period', 14)}"
     if n == "atr":
-        return f"atr_{tf}_p{params.get('period', 14)}"
+        return f"atr_{tf}_p{_ip('period', 14)}"
     if n in ("macd", "macd_tv"):
         return f"macd_{tf}"
     if n == "bollinger":
-        return f"boll_{tf}_p{params.get('period', 20)}"
+        return f"boll_{tf}_p{_ip('period', 20)}"
     if n == "donchian":
-        return f"dc_{tf}_p{params.get('period', 20)}"
+        return f"dc_{tf}_p{_ip('period', 20)}"
     if n == "adx":
-        return f"adx_{tf}_p{params.get('period', 14)}"
+        return f"adx_{tf}_p{_ip('period', 14)}"
     if n == "choppiness":
-        return f"chop_{tf}_p{params.get('period', 14)}"
+        return f"chop_{tf}_p{_ip('period', 14)}"
     if n == "linreg":
-        return f"linreg_{tf}_p{params.get('period', 14)}"
+        return f"linreg_{tf}_p{_ip('period', 14)}"
     if n == "hv":
-        return f"hv_{tf}_p{params.get('period', 20)}"
+        return f"hv_{tf}_p{_ip('period', 20)}"
     if n == "roc":
-        return f"roc_{tf}_p{params.get('period', 14)}"
+        return f"roc_{tf}_p{_ip('period', 14)}"
     if n == "pivot_structure":
         return f"pivot_{tf}"
     if n == "floor_pivots":

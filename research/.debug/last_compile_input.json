@@ -1,35 +1,128 @@
 {
-  "composition_id": "test_sweep",
-  "display_name": "Sweep Test",
+  "display_name": "Chop Harvester Clean ROC_1d14",
+  "description": "Mean-reversion strategy for ranging/choppy markets. Enters long near lower Donchian band, short near upper band. Exits at midline. ATR-based stop loss. Vol-regime gate filters for moderate volatility only.",
+  "archetype_tags": [
+    "mean_reversion",
+    "range_trading"
+  ],
+  "version": "1.0.0",
   "target_engine_version": "1.8.0",
+  "min_engine_version": "1.8.0",
+  "target_instrument": "BTCUSDT",
+  "target_variant": "perp",
   "indicator_instances": [
     {
-      "label": "macd_15m",
-      "indicator_id": 7,
-      "timeframe": "15m",
+      "label": "dc_5m",
+      "role": "filter",
+      "indicator_id": "donchian",
+      "timeframe": "5m",
       "parameters": {
-        "fast_period": 12,
-        "slow_period": 26,
-        "signal_period": 9
+        "period": 288
       },
       "outputs_used": [
-        "macd_line",
-        "signal_line",
-        "histogram"
+        "upper",
+        "lower",
+        "basis"
       ],
-      "warmup_bars": 35
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "dc_pos",
+      "role": "entry_signal",
+      "indicator_id": "dc_position",
+      "timeframe": "5m",
+      "parameters": {
+        "length": 288,
+        "donchian_label": "dc_5m"
+      },
+      "outputs_used": [
+        "percent_b"
+      ],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "vol_regime",
+      "role": "filter",
+      "indicator_id": "vol_regime",
+      "timeframe": "5m",
+      "parameters": {
+        "reference_vol_microbps": 3333365,
+        "donchian_label": "dc_5m"
+      },
+      "outputs_used": [
+        "vol_ratio"
+      ],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "atr_4h",
+      "role": "exit_stop_loss",
+      "indicator_id": "atr",
+      "timeframe": "4h",
+      "parameters": {
+        "period": 14
+      },
+      "outputs_used": [
+        "atr"
+      ],
+      "data_source": "BAR",
+      "bar_provider": "EXCHANGE_CANDLES"
+    },
+    {
+      "label": "roc_1d_p14_filter",
+      "indicator_id": "roc",
+      "timeframe": "1d",
+      "parameters": {
+        "period": 20
+      },
+      "outputs_used": [
+        "roc"
+      ],
+      "role": "filter",
+      "group": "Trend"
     }
   ],
   "entry_rules": [
     {
-      "name": "Long Entry",
+      "label": "long_entry",
       "direction": "LONG",
-      "evaluation_cadence": "15m",
+      "evaluation_cadence": "5m",
+      "entry_type": "MARKET",
       "conditions": [
         {
-          "indicator": "macd_15m",
-          "output": "histogram",
+          "indicator": "dc_pos",
+          "output": "percent_b",
+          "operator": "<",
+          "value": "200000"
+        },
+        {
+          "indicator": "roc_1d_p14_filter",
+          "output": "roc",
+          "operator": ">=",
+          "value": 0
+        }
+      ],
+      "condition_groups": []
+    },
+    {
+      "label": "short_entry",
+      "direction": "SHORT",
+      "evaluation_cadence": "5m",
+      "entry_type": "MARKET",
+      "conditions": [
+        {
+          "indicator": "dc_pos",
+          "output": "percent_b",
           "operator": ">",
+          "value": "800000"
+        },
+        {
+          "indicator": "roc_1d_p14_filter",
+          "output": "roc",
+          "operator": "<=",
           "value": 0
         }
       ],
@@ -38,48 +131,118 @@
   ],
   "exit_rules": [
     {
-      "name": "Signal Exit",
-      "type": "SIGNAL",
+      "label": "long_signal_exit",
+      "exit_type": "SIGNAL",
       "applies_to": [
         "LONG"
       ],
-      "evaluation_cadence": "15m",
+      "evaluation_cadence": "5m",
       "conditions": [
         {
-          "indicator": "macd_15m",
-          "output": "histogram",
-          "operator": "<",
-          "value": 0
+          "indicator": "dc_pos",
+          "output": "percent_b",
+          "operator": ">",
+          "value": 500000.0
         }
+      ]
+    },
+    {
+      "label": "short_signal_exit",
+      "exit_type": "SIGNAL",
+      "applies_to": [
+        "SHORT"
       ],
-      "parameters": {}
+      "evaluation_cadence": "5m",
+      "conditions": [
+        {
+          "indicator": "dc_pos",
+          "output": "percent_b",
+          "operator": "<",
+          "value": 500000.0
+        }
+      ]
+    },
+    {
+      "label": "atr_stop",
+      "exit_type": "STOP_LOSS",
+      "applies_to": [
+        "LONG",
+        "SHORT"
+      ],
+      "mode": "ATR_MULTIPLE",
+      "atr_multiple": 1.5,
+      "atr_indicator_label": "atr_4h"
     }
   ],
-  "gate_rules": [],
+  "gate_rules": [
+    {
+      "label": "vol_regime_gate",
+      "conditions": [
+        {
+          "indicator": "vol_regime",
+          "output": "vol_ratio",
+          "operator": ">=",
+          "value": 2400000.0
+        },
+        {
+          "indicator": "vol_regime",
+          "output": "vol_ratio",
+          "operator": "<=",
+          "value": 3500000.0
+        }
+      ]
+    }
+  ],
   "execution_params": {
-    "flip_enabled": false
+    "direction": "BOTH",
+    "leverage": 5.0,
+    "position_sizing": {
+      "mode": "RISK_FRACTION",
+      "risk_fraction_bps": 10000
+    },
+    "flip_enabled": true,
+    "post_exit_cooldown_bars": 144,
+    "stop_loss": {
+      "mode": "ATR_MULTIPLE",
+      "atr_multiple": 1.5,
+      "atr_indicator_label": "atr_4h"
+    },
+    "funding_model": {}
   },
-  "archetype_tags": [],
   "metadata": {
+    "spec_version": "1.5.2",
+    "thesis": "Mean-reversion in choppy regimes: buy near channel floor, sell near channel ceiling, exit at midline. Vol-regime gate ensures we only trade in moderate-volatility ranging conditions. ATR-based stop prevents catastrophic loss if regime shifts.",
+    "known_risks": [
+      "288-period 5m Donchian warmup \u2014 first ~24h produce no trades",
+      "Vol-regime gate may suppress entries during trending markets (by design)",
+      "ATR stop may trigger prematurely in volatile chop"
+    ],
     "triage_sensitive_params": [
       {
-        "param": "macd_15m.fast_period",
-        "min": 8,
-        "max": 16,
-        "default": 12
+        "param": "length",
+        "default": 288,
+        "min": 144,
+        "max": 576
       },
       {
-        "param": "macd_15m.slow_period",
-        "min": 20,
-        "max": 32,
-        "default": 26
-      },
-      {
-        "param": "macd_15m.signal_period",
-        "min": 5,
-        "max": 13,
-        "default": 9
+        "param": "atr_multiple",
+        "default": 1.5,
+        "min": 1.0,
+        "max": 2.5
       }
-    ]
-  }
+    ],
+    "research_notes": [],
+    "user_tags": [
+      "mean_reversion",
+      "chop",
+      "donchian",
+      "bidirectional"
+    ],
+    "forked_from": null,
+    "archive_reason": null,
+    "created": "2026-02-15T04:02:11.491968+00:00",
+    "updated_at": "2026-02-15T05:10:33.707229+00:00"
+  },
+  "composition_id": "a8295cfe-98f3-4edd-acba-2ef709507bee",
+  "spec_version": "1.5.2"
 }

@@ -496,11 +496,85 @@ def run_sweep_for_composition(
     return sweep_result
 
 
-def _apply_param_override(spec: dict, param_path: str, value) -> dict:
-    """Apply a parameter override to a deep copy of the spec. Original is never modified."""
-    spec = copy.deepcopy(spec)
-    parts = param_path.split(".")
+def run_single_sweep_step(
+    spec: dict,
+    param_name: str,
+    value: float,
+    dataset_path: str,
+    default_value: float = 0,
+) -> Dict[str, Any]:
+    """Run one sweep step: override param → compile → backtest → Test 1.
 
+    Designed for per-step cpu_bound calls so the UI can update between steps.
+    Loads bars from parquet internally (OS page cache makes repeated reads fast).
+    """
+    bars = load_bars_from_parquet(dataset_path)
+    try:
+        modified_spec = _apply_param_override(spec, param_name, value)
+        compilation = compile_spec(modified_spec)
+        resolved = compilation["resolved_artifact"]
+        config_hash = compilation["strategy_config_hash"]
+        save_artifacts(compilation)
+
+        trades, prices, n_bars = run_backtest(resolved, bars, config_hash)
+
+        from ui.services.triage_v2 import run_test_1 as run_test_1_v2
+        t1 = run_test_1_v2(trades, round_trip_cost_bps=32)
+
+        return {
+            "param_value": value,
+            "expectancy_bps": t1.metrics.get("expectancy_bps", 0),
+            "win_rate": t1.metrics.get("win_rate", 0),
+            "passed": t1.status == "PASS",
+            "trades": len(trades),
+            "hash": config_hash[:16],
+            "is_default": abs(value - default_value) < 0.001,
+        }
+    except Exception as e:
+        return {
+            "param_value": value,
+            "expectancy_bps": 0,
+            "win_rate": 0,
+            "passed": False,
+            "trades": 0,
+            "hash": "ERROR",
+            "is_default": abs(value - default_value) < 0.001,
+            "error": str(e),
+        }
+
+
+def save_sweep_result(
+    composition_id: str,
+    param_name: str,
+    results: List[Dict[str, Any]],
+) -> str:
+    """Save sweep results to disk. Returns file path."""
+    dir_path = os.path.join(RESEARCH_DIR, "sweep_results", composition_id)
+    os.makedirs(dir_path, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    safe_param = param_name.replace(".", "_").replace("/", "_")
+    filename = f"{safe_param}_{ts}.json"
+    filepath = os.path.join(dir_path, filename)
+    with open(filepath, "w") as f:
+        json.dump({
+            "composition_id": composition_id,
+            "param_name": param_name,
+            "timestamp": ts,
+            "results": results,
+        }, f, indent=2, default=str)
+    return filepath
+
+
+def _apply_param_override(spec: dict, param_path: str, value) -> dict:
+    """Apply a parameter override to a deep copy of the spec. Original is never modified.
+
+    Uses rsplit(".", 1) so that dots inside labels (e.g. "roc_1d_p10.0_filter")
+    don't break the label.param_name split.
+    """
+    spec = copy.deepcopy(spec)
+
+    # Primary path: label.param_name — split on LAST dot
+    parts = param_path.rsplit(".", 1)
     if len(parts) == 2:
         label, pname = parts
         for inst in spec.get("indicator_instances", []):
@@ -512,8 +586,10 @@ def _apply_param_override(spec: dict, param_path: str, value) -> dict:
                 rule[pname] = value
                 return spec
 
-    elif len(parts) == 3:
-        section, idx_str, field = parts
+    # Fallback: section.index.field (three-part path, no dots in keys)
+    parts3 = param_path.split(".")
+    if len(parts3) == 3:
+        section, idx_str, field = parts3
         try:
             idx = int(idx_str)
             if section in spec and idx < len(spec[section]):
