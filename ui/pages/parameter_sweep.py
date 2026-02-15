@@ -15,6 +15,68 @@ from ui.services.research_services import (
 )
 
 
+def _generate_centered_values(
+    current: float,
+    n_steps: int,
+    param_min: float,
+    param_max: float,
+    is_integer: bool = True,
+) -> list:
+    """Generate sweep values centered on the current parameter value.
+
+    The current value is always the midpoint. Equal number of points
+    above and below. Clamped to [param_min, param_max].
+    """
+    # Ensure odd number of steps
+    if n_steps % 2 == 0:
+        n_steps += 1
+
+    half = (n_steps - 1) // 2
+
+    # Calculate step size (~15% of current value, minimum 1 for int)
+    if current == 0:
+        step = 1 if is_integer else 0.1
+    else:
+        step = abs(current) * 0.15
+        if is_integer:
+            step = max(1, round(step))
+        else:
+            step = max(0.01, round(step, 4))
+
+    # Generate raw centered values
+    values = [current + (i - half) * step for i in range(n_steps)]
+
+    # Clamp: shift window if it exceeds bounds
+    lowest = values[0]
+    if lowest < param_min:
+        shift = param_min - lowest
+        values = [v + shift for v in values]
+
+    highest = values[-1]
+    if highest > param_max:
+        shift = highest - param_max
+        values = [v - shift for v in values]
+
+    # Final clamp (safety)
+    values = [max(param_min, min(param_max, v)) for v in values]
+
+    # Round integers
+    if is_integer:
+        values = [int(round(v)) for v in values]
+    else:
+        values = [round(v, 4) for v in values]
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for v in values:
+        if v not in seen:
+            seen.add(v)
+            unique.append(v)
+
+    return unique
+
+
 def _extract_sweepable_params(spec: dict) -> List[dict]:
     """Auto-extract sweepable parameters from indicator_instances.
 
@@ -113,6 +175,34 @@ def parameter_sweep_page(composition_id: str):
             ).classes("w-96")
             n_steps = ui.number(value=5, min=3, max=50, label="Steps").classes("w-24")
 
+        # Sweep values preview
+        preview_label = ui.label("").classes("text-xs text-gray-400 mt-1")
+
+        def _update_preview(_=None):
+            param_info = param_options.get(param_select.value)
+            if not param_info:
+                preview_label.text = ""
+                return
+            vals = _generate_centered_values(
+                current=param_info.get("default", 0),
+                n_steps=int(n_steps.value),
+                param_min=param_info.get("min", 0),
+                param_max=param_info.get("max", 100),
+                is_integer=isinstance(param_info.get("default", 0), int),
+            )
+            current = param_info.get("default", 0)
+            formatted = []
+            for v in vals:
+                if abs(v - current) < 0.001:
+                    formatted.append(f"[{v}]")
+                else:
+                    formatted.append(str(v))
+            preview_label.text = f"Sweep values: {', '.join(formatted)}"
+
+        param_select.on("change", _update_preview)
+        n_steps.on("change", _update_preview)
+        _update_preview()
+
         # Results container
         results_container = ui.column().classes("w-full mt-4")
 
@@ -143,8 +233,16 @@ def parameter_sweep_page(composition_id: str):
                 p_default = param_info.get("default", (p_min + p_max) / 2)
                 steps = int(n_steps.value)
 
-                ui.notify(f"Sweeping {param_select.value}: {p_min} -> {p_max} in {steps} steps",
-                          type="info")
+                # Generate centered sweep values
+                sweep_values = _generate_centered_values(
+                    current=p_default, n_steps=steps,
+                    param_min=p_min, param_max=p_max,
+                    is_integer=isinstance(p_default, int),
+                )
+
+                ui.notify(
+                    f"Sweeping {param_select.value}: {len(sweep_values)} values centered on {p_default}",
+                    type="info")
 
                 sweep_result = await run.cpu_bound(
                     run_sweep_for_composition,
@@ -155,6 +253,7 @@ def parameter_sweep_page(composition_id: str):
                     n_steps=steps,
                     dataset_path=dataset_path,
                     default_value=p_default,
+                    param_values=sweep_values,
                 )
 
                 results_container.clear()

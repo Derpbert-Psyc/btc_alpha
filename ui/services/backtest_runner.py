@@ -612,22 +612,22 @@ def compute_indicator_outputs(
     result = {}
 
     if ind_id == 1:  # EMA
-        period = params.get("period", params.get("length", 20))
+        period = int(params.get("period", params.get("length", 20)))
         ema_vals = compute_ema(closes, period)
         result["ema"] = ema_vals
 
     elif ind_id == 2:  # RSI
-        period = params.get("period", params.get("length", 14))
+        period = int(params.get("period", params.get("length", 14)))
         result["rsi"] = compute_rsi(closes, period)
 
     elif ind_id == 3:  # ATR
-        period = params.get("period", params.get("length", 14))
+        period = int(params.get("period", params.get("length", 14)))
         result["atr"] = compute_atr(highs, lows, closes, period)
 
     elif ind_id == 7:  # MACD
-        fast = params.get("fast_period", params.get("fast", 12))
-        slow = params.get("slow_period", params.get("slow", 26))
-        sig = params.get("signal_period", params.get("signal", 9))
+        fast = int(params.get("fast_period", params.get("fast", 12)))
+        slow = int(params.get("slow_period", params.get("slow", 26)))
+        sig = int(params.get("signal_period", params.get("signal", 9)))
         ml, sl, hist, ss, sss = compute_macd(closes, fast, slow, sig)
         result["macd_line"] = ml
         result["signal_line"] = sl
@@ -636,7 +636,7 @@ def compute_indicator_outputs(
         result["signal_slope_sign"] = sss
 
     elif ind_id == 8:  # ROC
-        period = params.get("period", params.get("length", 14))
+        period = int(params.get("period", params.get("length", 14)))
         roc_vals = [None] * len(closes)
         for i in range(period, len(closes)):
             if closes[i - period] != 0:
@@ -644,11 +644,11 @@ def compute_indicator_outputs(
         result["roc"] = roc_vals
 
     elif ind_id == 10:  # Choppiness
-        period = params.get("period", params.get("length", 14))
+        period = int(params.get("period", params.get("length", 14)))
         result["choppiness"] = compute_choppiness(highs, lows, closes, period)
 
     elif ind_id == 11:  # Bollinger
-        period = params.get("period", params.get("length", 20))
+        period = int(params.get("period", params.get("length", 20)))
         num_std = params.get("num_std", 2.0)
         basis, upper, lower, bw, pb = compute_bollinger(closes, period, num_std)
         result["basis"] = basis
@@ -658,11 +658,11 @@ def compute_indicator_outputs(
         result["percent_b"] = pb
 
     elif ind_id == 12:  # LinReg
-        period = params.get("period", params.get("length", 14))
+        period = int(params.get("period", params.get("length", 14)))
         result["slope"] = compute_linreg_slope(closes, period)
 
     elif ind_id == 14:  # Donchian
-        period = params.get("period", params.get("length", 20))
+        period = int(params.get("period", params.get("length", 20)))
         upper, lower, basis = compute_donchian(highs, lows, period)
         result["upper"] = upper
         result["lower"] = lower

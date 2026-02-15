@@ -1,5 +1,6 @@
 """Indicator Instance Picker — modal with 6 groups, configure instance."""
 
+import re
 from typing import Any, Dict, List, Optional
 
 from nicegui import ui
@@ -291,3 +292,171 @@ def _get_default_params(indicator_id: int) -> dict:
         18: {"num_bins": 50},         # VRVP
     }
     return dict(defaults.get(indicator_id, {}))
+
+
+# ---------------------------------------------------------------------------
+# Editor dialog (pre-populated for existing instance)
+# ---------------------------------------------------------------------------
+
+async def show_indicator_editor(
+    instance: Dict[str, Any],
+    target_engine_version: str = "1.8.0",
+    existing_labels: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Show editor modal for an existing indicator instance.
+
+    Returns the updated instance dict, or None if cancelled.
+    *existing_labels* should exclude the instance's own label.
+    """
+    result: Dict[str, Any] = {"value": None}
+    if existing_labels is None:
+        existing_labels = []
+
+    # Resolve indicator name / numeric ID
+    raw_id = instance.get("indicator_id", "")
+    if isinstance(raw_id, str):
+        indicator_id = resolve_indicator_id(raw_id)
+        ind_name = raw_id
+    else:
+        indicator_id = raw_id
+        ind_name = INDICATOR_ID_TO_NAME.get(indicator_id, str(indicator_id))
+
+    outputs = get_outputs_for_indicator(indicator_id) if indicator_id else {}
+    output_names = list(outputs.keys())
+
+    current_label = instance.get("label", "")
+    current_tf = instance.get("timeframe", "15m")
+    current_role = instance.get("role", "trigger")
+    current_group = instance.get("group", "Trend")
+    current_outputs = instance.get("outputs_used", output_names)
+    current_params = instance.get("parameters", {})
+
+    with ui.dialog() as dialog, ui.card().classes("w-[800px] max-w-[90vw]"):
+        ui.label(f"Edit: {ind_name}").classes("text-xl font-bold mb-4")
+
+        # ---- Label ----
+        label_input = ui.input(
+            value=current_label, label="Instance Label",
+        ).classes("w-full")
+        label_error = ui.label("").classes("text-xs text-red-400")
+
+        save_btn_ref: List[Any] = []  # forward ref for validation
+
+        def _validate_label():
+            val = label_input.value.strip()
+            if val != current_label and val in existing_labels:
+                label_error.text = "Label already exists"
+                if save_btn_ref:
+                    save_btn_ref[0].props("disable")
+            else:
+                label_error.text = ""
+                if save_btn_ref:
+                    save_btn_ref[0].props(remove="disable")
+
+        label_input.on("change", lambda _: _validate_label())
+
+        # ---- Timeframe ----
+        is_quick = current_tf in QUICK_TIMEFRAMES
+
+        def toggle_tf(e):
+            is_custom = e.value == "Custom"
+            quick_tf.set_visibility(not is_custom)
+            custom_row.set_visibility(is_custom)
+
+        with ui.row().classes("w-full items-center gap-2"):
+            ui.label("Timeframe:").classes("text-sm")
+            tf_mode = ui.toggle(
+                ["Quick", "Custom"],
+                value="Quick" if is_quick else "Custom",
+                on_change=toggle_tf,
+            ).props("dense")
+
+        quick_tf = ui.select(
+            QUICK_TIMEFRAMES,
+            value=current_tf if is_quick else "15m",
+            label="Timeframe",
+        ).classes("w-32")
+        quick_tf.set_visibility(is_quick)
+
+        custom_row = ui.row().classes("gap-2 items-center")
+        custom_row.set_visibility(not is_quick)
+
+        custom_val_init = 15
+        custom_unit_init = "m"
+        if not is_quick and current_tf:
+            m = re.match(r"(\d+)([mhd])", current_tf)
+            if m:
+                custom_val_init = int(m.group(1))
+                custom_unit_init = m.group(2)
+
+        with custom_row:
+            custom_val = ui.number(
+                value=custom_val_init, min=1, label="Value",
+            ).classes("w-20")
+            custom_unit = ui.select(
+                ["m", "h", "d"], value=custom_unit_init, label="Unit",
+            ).classes("w-20")
+
+        # ---- Role ----
+        role_select = ui.select(
+            ROLES, value=current_role, label="Role",
+        ).classes("w-32")
+
+        # ---- Group ----
+        group_names = [g["name"] for g in load_indicator_groups()]
+        group_select = ui.select(
+            group_names,
+            value=current_group if current_group in group_names else group_names[0],
+            label="Group",
+        ).classes("w-32")
+
+        # ---- Outputs used ----
+        outputs_select = ui.select(
+            output_names,
+            value=[o for o in current_outputs if o in output_names] or output_names,
+            label="Outputs Used",
+            multiple=True,
+        ).classes("w-full")
+
+        # ---- Parameters ----
+        ui.label("Parameters:").classes("text-sm text-gray-400 mt-2")
+        default_params = _get_default_params(indicator_id) if indicator_id else {}
+        all_params = {**default_params, **current_params}
+        param_inputs: Dict[str, Any] = {}
+        for pname, pval in all_params.items():
+            if isinstance(pval, str):
+                inp = ui.input(value=pval, label=pname).classes("w-48")
+            else:
+                inp = ui.number(value=pval, label=pname).classes("w-32")
+            param_inputs[pname] = inp
+
+        # ---- Confirm / Cancel ----
+        with ui.row().classes("w-full justify-end gap-2 mt-4"):
+            ui.button("Cancel", on_click=dialog.close).props("flat")
+
+            def confirm():
+                val = label_input.value.strip()
+                if val != current_label and val in existing_labels:
+                    label_error.text = "Label already exists"
+                    return
+                tf = (quick_tf.value if tf_mode.value == "Quick"
+                      else f"{int(custom_val.value)}{custom_unit.value}")
+                params = {k: v.value for k, v in param_inputs.items()}
+                updated = {
+                    "label": val,
+                    "indicator_id": instance.get("indicator_id"),
+                    "timeframe": tf,
+                    "parameters": params,
+                    "outputs_used": outputs_select.value or output_names,
+                    "role": role_select.value,
+                    "group": group_select.value,
+                }
+                result["value"] = updated
+                dialog.submit(updated)
+
+            save_btn = ui.button("Save", on_click=confirm).props("color=primary")
+            save_btn_ref.append(save_btn)
+
+    dialog.open()
+    await dialog
+    return result["value"]

@@ -214,13 +214,15 @@ def _display_saved_triage_result(saved_data: dict, state, strategy_hash: str):
     tier = tv2_dict.get("tier", "F")
     tier_color = TIER_COLORS.get(tier, "grey")
 
+    # Tier banner
     with ui.card().classes("w-full p-4"):
         with ui.row().classes("items-center gap-4"):
             _tier_css = {"S": "tier-badge-s", "A": "tier-badge-a", "B": "tier-badge-b"}.get(tier, "")
-            ui.badge(f"TIER {tier}", color=tier_color).classes(f"text-xl px-3 py-1 {_tier_css}")
+            ui.badge(f"TIER {tier}", color=tier_color).classes(f"text-2xl px-4 py-2 {_tier_css}")
             ui.label(tv2_dict.get("tier_action", "")).classes("text-lg font-bold")
             ui.badge("saved result", color="grey").classes("text-xs")
 
+        # Key metrics row
         m = tv2_dict.get("metrics", {})
         with ui.row().classes("gap-6 mt-3 flex-wrap text-sm"):
             wr = m.get("win_rate", 0)
@@ -232,21 +234,42 @@ def _display_saved_triage_result(saved_data: dict, state, strategy_hash: str):
                 ui.label(f"Breakeven: {be:.0f} bps")
             ui.label(f"Wilson LB: {m.get('wilson_lb', 0):.1f}%")
             ui.label(f"Max DD: {m.get('max_drawdown_pct', 0):.1f}%")
+            ui.label(f"Max Consec Loss: {m.get('max_consecutive_losses', 0)}")
 
-        # Test results summary
-        test_results = tv2_dict.get("test_results", [])
-        if test_results:
-            with ui.row().classes("gap-2 mt-2 flex-wrap"):
-                for tr in test_results:
-                    status = tr.get("status", "?")
-                    color = STATUS_COLORS.get(status, "grey")
-                    ui.badge(f"{tr.get('name', '?')}: {status}", color=color).classes("text-xs")
+        # Flags
+        flags = tv2_dict.get("flags", [])
+        if flags:
+            ui.separator()
+            for flag in flags:
+                ui.label(f"  {flag}").classes("text-sm text-amber-400")
 
-        with ui.row().classes("gap-8 mt-2 flex-wrap text-sm text-gray-400"):
-            ui.label(f"Dataset: {saved_data.get('dataset_filename', saved_data.get('dataset_prefix', ''))}")
-            ui.label(f"Trades: {saved_data.get('trade_count', 0)}")
-            ui.label(f"Bars: {saved_data.get('bar_count', 0):,}")
-            ui.label(f"Saved: {saved_data.get('timestamp', '')}")
+    # Per-test results table
+    test_results = tv2_dict.get("test_results", [])
+    if test_results:
+        _render_saved_test_results_table(test_results)
+
+    # Cost ramp table
+    cost_ramp = tv2_dict.get("cost_ramp_table", [])
+    if cost_ramp:
+        _render_cost_ramp_table(cost_ramp)
+
+    # Tier reasoning
+    tier_reasoning = tv2_dict.get("tier_reasoning", "")
+    if tier_reasoning:
+        with ui.expansion("Tier Reasoning", icon="psychology").classes("w-full mt-2"):
+            ui.code(tier_reasoning).classes("w-full text-sm")
+
+    # Summary stats
+    with ui.row().classes("gap-8 mt-2 flex-wrap text-sm text-gray-400"):
+        ui.label(f"Dataset: {saved_data.get('dataset_filename', saved_data.get('dataset_prefix', ''))}")
+        ui.label(f"Trades: {saved_data.get('trade_count', 0)}")
+        ui.label(f"Bars: {saved_data.get('bar_count', 0):,}")
+        ui.label(f"Saved: {saved_data.get('timestamp', '')}")
+
+    # Trade log (from saved data)
+    trade_details = saved_data.get("trade_details", [])
+    if trade_details:
+        _render_trade_log(trade_details)
 
     # Lifecycle promotion buttons (Shadow / Live)
     _render_lifecycle_promotion_buttons(state, strategy_hash)
@@ -350,6 +373,34 @@ def _render_test_results_table(tv2):
         table = ui.table(columns=columns, rows=rows, row_key="test").classes(
             "w-full mt-2").props("flat bordered dense")
 
+        table.add_slot("body-cell-status", """
+            <q-td :props="props">
+                <q-badge :color="props.row.status === 'PASS' ? 'green' :
+                                 props.row.status === 'WARN' ? 'amber' :
+                                 props.row.status === 'FAIL' ? 'red' : 'grey'"
+                         :label="props.row.status" />
+            </q-td>
+        """)
+
+
+def _render_saved_test_results_table(test_results: list):
+    """Render test results table from saved dict data."""
+    columns = [
+        {"name": "test", "label": "Test", "field": "test", "align": "left"},
+        {"name": "status", "label": "Status", "field": "status", "align": "center"},
+        {"name": "detail", "label": "Detail", "field": "detail", "align": "left"},
+    ]
+    rows = []
+    for tr in test_results:
+        rows.append({
+            "test": tr.get("name", "?"),
+            "status": tr.get("status", "?"),
+            "detail": tr.get("detail", tr.get("summary", ""))[:120],
+        })
+
+    if rows:
+        table = ui.table(columns=columns, rows=rows, row_key="test").classes(
+            "w-full mt-2").props("flat bordered dense")
         table.add_slot("body-cell-status", """
             <q-td :props="props">
                 <q-badge :color="props.row.status === 'PASS' ? 'green' :

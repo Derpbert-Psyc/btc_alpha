@@ -21,8 +21,8 @@ from ui.services.indicator_catalog import (
     get_outputs_for_indicator,
     resolve_indicator_id,
 )
-from ui.components.indicator_picker import show_indicator_picker
-from ui.components.condition_builder import render_condition_builder, _hydrate_condition
+from ui.components.indicator_picker import show_indicator_picker, show_indicator_editor
+from ui.components.condition_builder import render_condition_builder, _hydrate_condition, _rename_indicator_references
 from ui.components.exit_rule_editor import render_exit_rules
 from ui.components.gate_editor import render_gate_editor
 from ui.components.execution_form import render_execution_form
@@ -451,14 +451,41 @@ def _get_indicator_target_tab(state, indicator_label: str, indicator_role: str) 
     return role_map.get(indicator_role, "Indicators")
 
 
-def _on_indicator_row_click(state, event_args):
-    """Handle indicator table row click — switch to relevant tab."""
+async def _on_indicator_row_click(state, event_args, on_change):
+    """Handle indicator table row click — open inline edit dialog."""
+    if state.locked:
+        return
     row = event_args[1]
-    label = row.get("label", "")
-    role = row.get("role", "")
-    target = _get_indicator_target_tab(state, label, role)
-    if target != state.active_tab:
-        state.active_tab = target
+    idx = row.get("idx")
+    instances = state.working_spec.get("indicator_instances", [])
+    if idx is None or idx < 0 or idx >= len(instances):
+        return
+
+    instance = instances[idx]
+    old_label = instance.get("label", "")
+
+    other_labels = [
+        inst.get("label", "") for inst in instances
+        if inst.get("label") != old_label
+    ]
+
+    updated = await show_indicator_editor(
+        instance,
+        state.working_spec.get("target_engine_version", "1.8.0"),
+        existing_labels=other_labels,
+    )
+
+    if updated:
+        new_label = updated.get("label", old_label)
+
+        # Rename all condition references if label changed
+        if new_label != old_label:
+            _rename_indicator_references(state.working_spec, old_label, new_label)
+
+        # Apply updated fields to the instance
+        instances[idx] = updated
+        state.mark_changed()
+        on_change()
         ui.navigate.to(f"/editor/{state.composition_id}")
 
 
@@ -507,7 +534,7 @@ def _render_indicators_tab(state: EditorState, on_change):
 
         table = ui.table(columns=columns, rows=rows, row_key="idx").classes(
             "w-full").props("flat bordered dense")
-        table.on("row-click", lambda e: _on_indicator_row_click(state, e.args))
+        table.on("row-click", lambda e: _on_indicator_row_click(state, e.args, on_change))
 
         # Delete action slot
         if state.locked:

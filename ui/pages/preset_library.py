@@ -1,4 +1,4 @@
-"""Preset Library — load MACD Confluence or DBMR."""
+"""Preset Library — browse and load strategy presets."""
 
 import json
 import os
@@ -35,6 +35,24 @@ PRESET_INFO = [
         "file": "dbmr.json",
         "description": "Bollinger mean reversion, structure-aware exits. Contrasting archetype.",
         "archetype": "mean_reversion, volatility_based",
+    },
+    {
+        "name": "Chop Harvester Clean",
+        "file": "chop_harvester_clean.json",
+        "description": "Mean-reversion for ranging markets. Donchian channel position entry, ATR 1.5x stop, 144-bar cooldown.",
+        "archetype": "mean_reversion, range_trading",
+    },
+    {
+        "name": "Chop Harvester Tight Stop",
+        "file": "chop_harvester_tight_stop.json",
+        "description": "Tighter stop variant (ATR 1.3x). Faster exit on adverse moves, same 144-bar cooldown.",
+        "archetype": "mean_reversion, range_trading",
+    },
+    {
+        "name": "Chop Harvester Conservative",
+        "file": "chop_harvester_conservative.json",
+        "description": "Conservative variant with doubled cooldown (288 bars). Fewer trades, avoids rapid re-entry whipsaws.",
+        "archetype": "mean_reversion, range_trading",
     },
 ]
 

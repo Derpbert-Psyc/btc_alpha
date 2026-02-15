@@ -235,6 +235,7 @@ def run_triage_for_composition(
         "trade_count": result.trade_count,
         "bar_count": result.bar_count,
         "triage_v2": triage_result.to_dict(),
+        "trade_details": result.trade_details,
         "timestamp": timestamp,
     }
 
@@ -413,6 +414,7 @@ def run_sweep_for_composition(
     n_steps: int,
     dataset_path: str,
     default_value: float = 0,
+    param_values: Optional[list] = None,
 ) -> SweepResult:
     """Run parameter sweep: vary one param, compile + backtest + Test 1.
 
@@ -426,7 +428,9 @@ def run_sweep_for_composition(
     bars = load_bars_from_parquet(dataset_path)
 
     # Generate parameter values
-    if isinstance(param_min, int) and isinstance(param_max, int):
+    if param_values is not None:
+        values = param_values
+    elif isinstance(param_min, int) and isinstance(param_max, int):
         step = max(1, (param_max - param_min) // max(1, n_steps - 1))
         values = list(range(int(param_min), int(param_max) + 1, step))[:n_steps]
     else:

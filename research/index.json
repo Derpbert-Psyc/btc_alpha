@@ -5,6 +5,30 @@
       "latest_compiled_hash": "sha256:d1a6731b979ff2f0fb7df7ca629d34e20e5aa1b15a2b6cf17b043d87579bd686",
       "created": "2026-02-14T12:29:41.404246+00:00",
       "updated_at": "2026-02-14T12:43:26.829238+00:00"
+    },
+    "9eb50386-2d57-4e90-9681-ef0ccabc54a0": {
+      "display_name": "Chop Harvester Tight Stop",
+      "latest_compiled_hash": null,
+      "created": "2026-02-14T16:55:52.907592+00:00",
+      "updated_at": "2026-02-14T16:55:52.907592+00:00"
+    },
+    "47e8d8d8-340f-473d-9a58-40667270375d": {
+      "display_name": "Chop Harvester Clean ROC_1d_20",
+      "latest_compiled_hash": null,
+      "created": "2026-02-14T17:35:13.627697+00:00",
+      "updated_at": "2026-02-14T19:25:23.813933+00:00"
+    },
+    "796eed3e-ef7f-4e54-9af4-a0b7ffe0cbc0": {
+      "display_name": "Chop Harvester Clean ROC_1d_10",
+      "latest_compiled_hash": "sha256:086ebdc859776687eecea696e611e66d42da46168b675951422677e6f9082e72",
+      "created": "2026-02-14T18:04:19.098853+00:00",
+      "updated_at": "2026-02-14T19:12:55.663801+00:00"
+    },
+    "a8295cfe-98f3-4edd-acba-2ef709507bee": {
+      "display_name": "Chop Harvester Clean ROC_1d12",
+      "latest_compiled_hash": null,
+      "created": "2026-02-15T04:02:11.491968+00:00",
+      "updated_at": "2026-02-15T04:03:58.839313+00:00"
     }
   }
 }
