@@ -134,7 +134,7 @@ def _render_shadow_card(strat: dict):
 
         # Shadow Execution Panel
         ui.separator().classes("my-3")
-        _render_shadow_execution_panel()
+        _render_shadow_execution_panel(strat)
 
         # Action buttons
         ui.separator().classes("my-3")
@@ -160,9 +160,10 @@ def _render_shadow_card(strat: dict):
                           h)).props("color=negative outline dense")
 
 
-def _render_shadow_execution_panel():
-    """Render the shadow execution panel based on API config state."""
+def _render_shadow_execution_panel(strat: dict):
+    """Render shadow execution panel with start/stop and live status."""
     api = _check_api_config("testnet")
+    cid = strat["composition_id"]
 
     if not api["configured"]:
         with ui.card().classes("w-full p-4 accent-amber"):
@@ -188,22 +189,110 @@ def _render_shadow_execution_panel():
                 "Shadow mode uses the Bybit TESTNET API. "
                 "No real funds are at risk."
             ).classes("text-sm text-gray-400 mt-2 italic")
-    else:
-        with ui.card().classes("w-full p-4 accent-green"):
-            with ui.row().classes("items-center gap-2 mb-2"):
-                ui.icon("check_circle", color="green").classes("text-xl")
-                ui.label("API CONFIGURED").classes(
-                    "text-lg font-bold text-green-400")
+        return
+
+    from ui.services.shadow_runner import get_runner
+    runner = get_runner(cid)
+
+    with ui.card().classes("w-full p-4 accent-green"):
+        with ui.row().classes("items-center gap-2 mb-2"):
+            ui.icon("check_circle", color="green").classes("text-xl")
+            ui.label("API CONFIGURED").classes("text-lg font-bold text-green-400")
+
+        status_lbl = ui.label("").classes("text-sm font-bold text-green-400")
+        with ui.row().classes("gap-6 mt-2 flex-wrap text-sm"):
+            bars_lbl = ui.label("")
+            uptime_lbl = ui.label("")
+            trades_lbl = ui.label("")
+            pnl_lbl = ui.label("")
+        position_lbl = ui.label("").classes("text-sm font-bold text-blue-400 mt-1")
+
+        def _refresh_status():
+            r = get_runner(cid)
+            if not r or r.status == "IDLE":
+                status_lbl.text = "Status: IDLE"
+                bars_lbl.text = ""
+                uptime_lbl.text = ""
+                trades_lbl.text = ""
+                pnl_lbl.text = ""
+                position_lbl.text = ""
+                return
+            st = r.get_status()
+            status_lbl.text = f"Status: {st['status']}"
+            bars_lbl.text = f"Bars: {st['bars_received']}"
+            uptime_lbl.text = f"Uptime: {st['uptime_seconds']:.0f}s"
+            t = st["tracker"]
+            if t["total_trades"] > 0:
+                trades_lbl.text = (
+                    f"Trades: {t['total_trades']} | Win: {t['win_rate']:.1f}%"
+                )
+                pnl_lbl.text = (
+                    f"PnL: {t['total_pnl_bps']:+.1f} bps | "
+                    f"MaxDD: {t['max_drawdown_bps']:.1f} bps"
+                )
+            if t.get("open_position"):
+                pos = t["open_position"]
+                position_lbl.text = (
+                    f"Open: {pos['side'].upper()} @ {pos['entry_price']:,.2f}"
+                )
+            else:
+                position_lbl.text = ""
+
+        ui.timer(2.0, _refresh_status)
+        _refresh_status()
+
+        if runner and runner.status == "RUNNING":
+            ui.button(
+                "Stop Shadow", icon="stop",
+                on_click=lambda: _stop_shadow(cid),
+            ).props("color=negative dense").classes("mt-2")
+        else:
+            status_text = ""
+            if runner:
+                status_text = f"Last status: {runner.status}"
+                if runner.error:
+                    status_text += f" — {runner.error}"
 
             ui.label(
-                "Bybit testnet credentials detected. "
-                "Shadow execution engine coming in Phase 2."
+                "Bybit testnet credentials detected. Ready for shadow execution."
             ).classes("text-sm text-gray-400 mt-2")
 
-            ui.button("Start Shadow", icon="play_arrow").props(
-                "color=positive disable").classes("mt-2")
-            ui.label("Shadow execution not yet implemented.").classes(
-                "text-xs text-gray-500 mt-1")
+            if status_text:
+                ui.label(status_text).classes("text-xs text-gray-500 mt-1")
+
+            ui.button(
+                "Start Shadow", icon="play_arrow",
+                on_click=lambda s=strat: _start_shadow(s),
+            ).props("color=positive dense").classes("mt-2")
+
+
+async def _start_shadow(strat: dict):
+    """Start shadow execution for a strategy."""
+    from ui.services.shadow_runner import start_shadow
+    from ui.services.compiler_bridge import load_resolved_artifact
+
+    cid = strat["composition_id"]
+    compiled_hash = strat["compiled_hash"]
+
+    try:
+        resolved = load_resolved_artifact(compiled_hash)
+        if not resolved:
+            ui.notify("No resolved artifact found. Recompile first.", type="negative")
+            return
+
+        await start_shadow(cid, resolved, strat.get("spec", {}))
+        ui.notify("Shadow started — receiving live bars", type="positive")
+        ui.navigate.to("/shadow")
+    except Exception as e:
+        ui.notify(f"Failed to start shadow: {e}", type="negative")
+
+
+def _stop_shadow(composition_id: str):
+    """Stop shadow execution."""
+    from ui.services.shadow_runner import stop_shadow
+    stop_shadow(composition_id)
+    ui.notify("Shadow stopped", type="info")
+    ui.navigate.to("/shadow")
 
 
 async def _promote_to_live(composition_id: str, compiled_hash: str):

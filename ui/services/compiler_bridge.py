@@ -68,6 +68,23 @@ def save_promotion(
     )
 
 
+def load_resolved_artifact(strategy_config_hash: str) -> Optional[dict]:
+    """Load resolved artifact JSON for a compiled strategy.
+
+    Compiler writes: research/strategies/{hash}/resolved.json
+    """
+    hash_val = strategy_config_hash
+    if hash_val.startswith("sha256:"):
+        hash_val = hash_val[7:]
+
+    resolved_path = os.path.join(RESEARCH_DIR, "strategies", hash_val, "resolved.json")
+    if not os.path.exists(resolved_path):
+        return None
+
+    with open(resolved_path, "r") as f:
+        return json.load(f)
+
+
 def get_capability_registry() -> Dict[str, Dict[str, str]]:
     """Return the capability registry for UI filtering."""
     return dict(CAPABILITY_REGISTRY)
