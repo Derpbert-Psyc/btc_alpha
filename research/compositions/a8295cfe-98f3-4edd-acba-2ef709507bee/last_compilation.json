@@ -251,7 +251,7 @@
     "composition_version": "1.0.0",
     "composition_spec_hash": "sha256:9866633b417b6f0357fa09dc6f7a6c8c6169174e1779b63182be3571d1383aa3",
     "strategy_config_hash": "sha256:946e88b7807ba7934438e86f07af9f8a13185ec49d2080a6c685adb09853408a",
-    "timestamp": "2026-02-15T05:10:34.736786+00:00",
+    "timestamp": "2026-02-15T13:13:18.681076+00:00",
     "compiler_version": "1.0.0",
     "lowering_pipeline_version": "1.0.0",
     "capability_registry_version": "1.0.0",
@@ -285,5 +285,5 @@
     }
   },
   "lowering_report_semantic_hash": "sha256:4c431de7f925b02d7db0e42a7af7361b6ac530fb4271838d39648a0c1b476d36",
-  "lowering_report_full_hash": "sha256:9e469918cfe394f9848af1db657c677f4dca4e520b3876f1a5c38507d3fd8e1f"
+  "lowering_report_full_hash": "sha256:b8df0a4415123dc41f895713751f30bb5063822b7973597813fb18386107198d"
 }

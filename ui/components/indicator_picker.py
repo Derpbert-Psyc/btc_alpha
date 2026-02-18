@@ -401,8 +401,11 @@ async def show_indicator_editor(
             ).classes("w-20")
 
         # ---- Role ----
+        role_options = list(ROLES)
+        if current_role and current_role not in role_options:
+            role_options.append(current_role)
         role_select = ui.select(
-            ROLES, value=current_role, label="Role",
+            role_options, value=current_role, label="Role",
         ).classes("w-32")
 
         # ---- Group ----

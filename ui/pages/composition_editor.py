@@ -451,12 +451,11 @@ def _get_indicator_target_tab(state, indicator_label: str, indicator_role: str) 
     return role_map.get(indicator_role, "Indicators")
 
 
-async def _on_indicator_row_click(state, event_args, on_change):
-    """Handle indicator table row click — open inline edit dialog."""
+async def _on_indicator_row_click(state, idx, on_change):
+    """Handle indicator label click — open inline edit dialog."""
     if state.locked:
+        ui.notify("Strategy is locked (promoted). Duplicate to edit.", type="warning")
         return
-    row = event_args[1]
-    idx = row.get("idx")
     instances = state.working_spec.get("indicator_instances", [])
     if idx is None or idx < 0 or idx >= len(instances):
         return
@@ -534,7 +533,20 @@ def _render_indicators_tab(state: EditorState, on_change):
 
         table = ui.table(columns=columns, rows=rows, row_key="idx").classes(
             "w-full").props("flat bordered dense")
-        table.on("row-click", lambda e: _on_indicator_row_click(state, e.args, on_change))
+
+        # Clickable label column — replaces row-click which has even-row bug
+        table.add_slot("body-cell-label", """
+            <q-td :props="props" style="cursor: pointer;"
+                  @click="$parent.$emit('edit', props.row.idx)">
+                <span class="text-blue-300 underline-offset-2 hover:underline">
+                    {{ props.row.label }}
+                </span>
+            </q-td>
+        """)
+
+        async def _handle_edit(e):
+            await _on_indicator_row_click(state, e.args, on_change)
+        table.on("edit", _handle_edit)
 
         # Delete action slot
         if state.locked:

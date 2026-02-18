@@ -42,3 +42,9 @@ htmlcov/
 # Env files
 .env
 .env.*
+
+# local lab sandbox
+oscillation_lab/
+
+# API keys / secrets
+config/api_keys.json

@@ -171,7 +171,8 @@
       ],
       "mode": "ATR_MULTIPLE",
       "atr_multiple": 1.5,
-      "atr_indicator_label": "atr_4h"
+      "atr_indicator_label": "atr_4h",
+      "evaluation_cadence": "1m"
     }
   ],
   "gate_rules": [
@@ -241,7 +242,7 @@
     "forked_from": null,
     "archive_reason": null,
     "created": "2026-02-15T04:02:11.491968+00:00",
-    "updated_at": "2026-02-15T05:10:33.707229+00:00"
+    "updated_at": "2026-02-15T10:15:57.348325+00:00"
   },
   "composition_id": "a8295cfe-98f3-4edd-acba-2ef709507bee",
   "spec_version": "1.5.2"
