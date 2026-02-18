@@ -333,6 +333,12 @@ def _render_instance_card(instance_id: str, config: dict):
                 else:
                     ui.label("FLAT").classes("text-xs text-gray-500")
 
+                # Always show friction
+                t_friction = st.get("tracker", {})
+                rt_bps = t_friction.get("round_trip_bps", 0)
+                if rt_bps:
+                    ui.label(f"Friction: {rt_bps:.0f} bps RT").classes("text-xs text-gray-600")
+
             # --- Section 2: Paper Trading Stats ---
             sec2_container.clear()
             with sec2_container:
@@ -379,7 +385,7 @@ def _render_instance_card(instance_id: str, config: dict):
             # --- Section 3: Timeframe Indicators ---
             sec3_container.clear()
             with sec3_container:
-                strat = st.get("strategy", {})
+                strat = st.get("strategy_state", {})
                 tf_detail = strat.get("tf_detail", {}) if isinstance(strat, dict) else {}
                 if tf_detail:
                     ui.separator().classes("my-1")
