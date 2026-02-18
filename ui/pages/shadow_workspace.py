@@ -216,13 +216,35 @@ def _render_daemon_instances_section():
             _render_instance_card(instance_id, config)
 
 
+def _slope_sign_text(sign) -> str:
+    """Convert slope sign to display text with color hint."""
+    if sign == 1:
+        return "+1"
+    elif sign == -1:
+        return "-1"
+    elif sign == 0:
+        return "0"
+    return "--"
+
+
+def _slope_sign_color(sign) -> str:
+    """CSS color class for slope sign."""
+    if sign == 1:
+        return "text-green-400"
+    elif sign == -1:
+        return "text-red-400"
+    elif sign == 0:
+        return "text-yellow-400"
+    return "text-gray-500"
+
+
 def _render_instance_card(instance_id: str, config: dict):
-    """Render a single daemon instance card with live-updating status."""
+    """Render a single daemon instance card with 3-section live-updating status."""
     exchange = config["exchange"]
     strategy = config.get("strategy", "")
     long_only = config.get("long_only", False)
 
-    with ui.card().classes("w-96 p-4"):
+    with ui.card().classes("w-[480px] p-4"):
         # Header row: instance ID + badges
         with ui.row().classes("w-full items-center gap-2 mb-2"):
             status_icon = ui.icon("circle", color="grey").classes("text-xs")
@@ -236,105 +258,193 @@ def _render_instance_card(instance_id: str, config: dict):
             if long_only:
                 ui.badge("Long Only", color="teal")
 
-        # Timeframes summary
-        tf_labels = ", ".join(config.get("timeframes", {}).keys())
-        ui.label(f"TFs: {tf_labels}").classes("text-xs text-gray-500 mb-2")
+        # Section 1: Status & Position
+        sec1_container = ui.column().classes("w-full gap-0")
 
-        # Status and metrics
-        status_lbl = ui.label("NOT STARTED").classes("text-sm font-bold")
-        warmup_lbl = ui.label("").classes("text-xs text-cyan-400")
-        bars_lbl = ui.label("").classes("text-xs text-gray-400")
-        uptime_lbl = ui.label("").classes("text-xs text-gray-400")
-        trades_lbl = ui.label("").classes("text-xs text-gray-400")
-        pnl_lbl = ui.label("").classes("text-xs text-gray-400")
-        position_lbl = ui.label("").classes("text-xs font-bold text-blue-400")
-        gap_lbl = ui.label("").classes("text-xs text-orange-400")
-        stab_lbl = ui.label("").classes("text-xs text-purple-400")
+        # Section 2: Paper Trading Stats
+        sec2_container = ui.column().classes("w-full gap-0 mt-2")
 
-        # Button container (refreshed by timer)
+        # Section 3: Timeframe Indicators
+        sec3_container = ui.column().classes("w-full gap-0 mt-2")
+
+        # Button container
         btn_container = ui.row().classes("mt-2 gap-2")
 
         def _refresh():
             st = read_shadow_status(instance_id)
 
-            if not st:
-                status_icon.props("color=grey")
-                status_lbl.text = "NOT STARTED"
-                status_lbl.classes(replace="text-sm font-bold text-gray-400")
-                warmup_lbl.text = ""
-                bars_lbl.text = ""
-                uptime_lbl.text = ""
-                trades_lbl.text = ""
-                pnl_lbl.text = ""
-                position_lbl.text = ""
-                gap_lbl.text = ""
-                stab_lbl.text = ""
-                btn_container.clear()
-                with btn_container:
-                    ui.button(
-                        "Start Shadow", icon="play_arrow",
-                        on_click=lambda iid=instance_id: _start_instance(iid),
-                    ).props("color=positive dense")
-                return
+            # --- Section 1: Status & Position ---
+            sec1_container.clear()
+            with sec1_container:
+                if not st:
+                    status_icon.props("color=grey")
+                    ui.label("NOT STARTED").classes("text-sm font-bold text-gray-400")
+                    btn_container.clear()
+                    with btn_container:
+                        ui.button(
+                            "Start Shadow", icon="play_arrow",
+                            on_click=lambda iid=instance_id: _start_instance(iid),
+                        ).props("color=positive dense")
+                    sec2_container.clear()
+                    sec3_container.clear()
+                    return
 
-            s = st.get("status", "UNKNOWN")
-            color = _status_color(s)
-            status_icon.props(f"color={color}")
-            status_lbl.text = s
-            status_lbl.classes(replace=f"text-sm font-bold text-{color}-400")
+                s = st.get("status", "UNKNOWN")
+                color = _status_color(s)
+                status_icon.props(f"color={color}")
 
-            # Warmup progress
-            if s == "WARMING_UP":
-                warmup_lbl.text = st.get("warmup_progress", "")
-            else:
-                warmup_lbl.text = ""
+                with ui.row().classes("w-full items-center gap-3"):
+                    ui.label(s).classes(f"text-sm font-bold text-{color}-400")
+                    ui.label(f"Uptime: {st.get('uptime_str', '--')}").classes(
+                        "text-xs text-gray-400")
+                    bars_text = f"Bars: {st.get('bars_received', 0):,}"
+                    lbp = st.get("last_bar_price")
+                    if lbp and s in ("RUNNING", "STABILIZING"):
+                        bars_text += f" | ${lbp:,.2f}"
+                    ui.label(bars_text).classes("text-xs text-gray-400")
 
-            # Stabilization countdown
-            stab_rem = st.get("stabilization_remaining_s")
-            if s == "STABILIZING" and stab_rem is not None:
-                stab_lbl.text = f"Stabilizing: {stab_rem}s remaining"
-            else:
-                stab_lbl.text = ""
+                # Warmup progress
+                if s == "WARMING_UP":
+                    wp = st.get("warmup_progress", "")
+                    if wp:
+                        ui.label(wp).classes("text-xs text-cyan-400")
 
-            bars_lbl.text = f"Bars: {st.get('bars_received', 0):,}"
-            uptime_lbl.text = f"Uptime: {st.get('uptime_str', '--')}"
+                # Stabilization countdown
+                stab_rem = st.get("stabilization_remaining_s")
+                if s == "STABILIZING" and stab_rem is not None:
+                    ui.label(f"Stabilizing: {stab_rem}s remaining").classes(
+                        "text-xs text-purple-400")
 
-            # Gap flag
-            if st.get("gap_flag"):
-                gap_lbl.text = "GAP DETECTED - signals suppressed"
-            else:
-                gap_lbl.text = ""
+                # Gap flag
+                if st.get("gap_flag"):
+                    ui.label("GAP DETECTED - signals suppressed").classes(
+                        "text-xs text-orange-400 font-bold")
 
-            # Tracker metrics
-            t = st.get("tracker", {})
-            total = t.get("total_trades", 0)
-            if total > 0:
-                trades_lbl.text = (
-                    f"Trades: {total} | Win: {t.get('win_rate', 0):.1f}%"
-                )
-                pnl_bps = t.get("total_pnl_bps", 0)
-                dd_bps = t.get("max_drawdown_bps", 0)
-                pnl_lbl.text = (
-                    f"PnL: {pnl_bps:+.1f} bps | MaxDD: {dd_bps:.1f} bps"
-                )
-                sl = t.get("stop_loss_count", 0)
-                if sl > 0:
-                    pnl_lbl.text += f" | SL: {sl}"
-            else:
-                trades_lbl.text = ""
-                pnl_lbl.text = ""
+                # Position
+                t = st.get("tracker", {})
+                pos = t.get("position", 0)
+                entry = t.get("entry_fill")
+                if pos == 1 and entry:
+                    ui.label(f"LONG @ {entry:,.2f}").classes(
+                        "text-sm font-bold text-green-400")
+                elif pos == -1 and entry:
+                    ui.label(f"SHORT @ {entry:,.2f}").classes(
+                        "text-sm font-bold text-red-400")
+                else:
+                    ui.label("FLAT").classes("text-xs text-gray-500")
 
-            # Position
-            pos = t.get("position", 0)
-            entry = t.get("entry_fill")
-            if pos == 1 and entry:
-                position_lbl.text = f"LONG @ {entry:,.2f}"
-            elif pos == -1 and entry:
-                position_lbl.text = f"SHORT @ {entry:,.2f}"
-            else:
-                position_lbl.text = ""
+            # --- Section 2: Paper Trading Stats ---
+            sec2_container.clear()
+            with sec2_container:
+                t = st.get("tracker", {})
+                total = t.get("total_trades", 0)
+                if total > 0:
+                    ui.separator().classes("my-1")
+                    ui.label("Paper Trading").classes(
+                        "text-xs font-bold text-gray-400 mb-1")
+                    # Stats grid: 2 columns
+                    with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-0"):
+                        # Row 1
+                        ui.label(f"Trades: {total}").classes("text-xs text-gray-300")
+                        ui.label(
+                            f"Win Rate: {t.get('win_rate', 0):.1f}%"
+                        ).classes("text-xs text-gray-300")
+                        # Row 2
+                        pnl = t.get("total_pnl_bps", 0)
+                        pnl_cls = "text-green-400" if pnl >= 0 else "text-red-400"
+                        ui.label(f"PnL: {pnl:+.1f} bps").classes(
+                            f"text-xs font-bold {pnl_cls}")
+                        ui.label(
+                            f"MaxDD: {t.get('max_drawdown_bps', 0):.1f} bps"
+                        ).classes("text-xs text-gray-300")
+                        # Row 3
+                        avg = t.get("avg_pnl_per_trade_bps", 0)
+                        avg_cls = "text-green-400" if avg >= 0 else "text-red-400"
+                        ui.label(f"Avg/Trade: {avg:+.1f} bps").classes(
+                            f"text-xs {avg_cls}")
+                        ui.label(
+                            f"Friction: {t.get('round_trip_bps', 0):.0f} bps RT"
+                        ).classes("text-xs text-gray-500")
+                        # Row 4
+                        el = t.get("entries_long", 0)
+                        es = t.get("entries_short", 0)
+                        ui.label(f"Entries: {el}L / {es}S").classes(
+                            "text-xs text-gray-300")
+                        sl = t.get("stop_loss_count", 0)
+                        exits_text = f"Exits: {t.get('exits_total', 0)}"
+                        if sl > 0:
+                            exits_text += f" (SL: {sl})"
+                        ui.label(exits_text).classes("text-xs text-gray-300")
 
-            # Buttons
+            # --- Section 3: Timeframe Indicators ---
+            sec3_container.clear()
+            with sec3_container:
+                strat = st.get("strategy", {})
+                tf_detail = strat.get("tf_detail", {}) if isinstance(strat, dict) else {}
+                if tf_detail:
+                    ui.separator().classes("my-1")
+                    ui.label("Timeframe Indicators").classes(
+                        "text-xs font-bold text-gray-400 mb-1")
+
+                    # Determine role for each TF
+                    roles = config.get("roles", {})
+                    macro_set = set(roles.get("macro", []))
+                    intra_set = set(roles.get("intra", []))
+                    entry_tf = roles.get("entry", "")
+                    exit_tf = roles.get("exit", "")
+
+                    # Table header
+                    with ui.row().classes("w-full gap-0"):
+                        ui.label("TF").classes(
+                            "text-xs font-bold text-gray-500 w-16")
+                        ui.label("Role").classes(
+                            "text-xs font-bold text-gray-500 w-16")
+                        ui.label("Bars").classes(
+                            "text-xs font-bold text-gray-500 w-20")
+                        ui.label("Ready").classes(
+                            "text-xs font-bold text-gray-500 w-14")
+                        ui.label("Slope").classes(
+                            "text-xs font-bold text-gray-500 w-12")
+
+                    # Rows ordered by config timeframes
+                    for tf_label in config.get("timeframes", {}).keys():
+                        detail = tf_detail.get(tf_label, {})
+                        bars_done = detail.get("bars_processed", 0)
+                        required = detail.get("required", 27)
+                        ready = detail.get("ready", False)
+                        slope = detail.get("slope_sign")
+
+                        # Determine role label
+                        if tf_label in macro_set:
+                            role = "macro"
+                        elif tf_label in intra_set:
+                            role = "intra"
+                        elif tf_label == entry_tf:
+                            role = "entry"
+                        elif tf_label == exit_tf:
+                            role = "exit"
+                        else:
+                            role = ""
+
+                        with ui.row().classes("w-full gap-0 items-center"):
+                            ui.label(tf_label).classes(
+                                "text-xs text-gray-300 w-16 font-mono")
+                            ui.label(role).classes(
+                                "text-xs text-gray-500 w-16")
+                            bar_text = f"{bars_done}/{required}"
+                            bar_cls = "text-gray-300" if bars_done >= required else "text-yellow-400"
+                            ui.label(bar_text).classes(
+                                f"text-xs {bar_cls} w-20 font-mono")
+                            ready_icon = "check_circle" if ready else "pending"
+                            ready_color = "green" if ready else "grey"
+                            ui.icon(ready_icon, color=ready_color).classes(
+                                "text-xs w-14")
+                            sign_text = _slope_sign_text(slope)
+                            sign_cls = _slope_sign_color(slope)
+                            ui.label(sign_text).classes(
+                                f"text-xs font-bold {sign_cls} w-12 font-mono")
+
+            # --- Buttons ---
             is_active = s in (
                 "RUNNING", "WARMING_UP", "CONNECTING",
                 "RECONNECTING", "STABILIZING", "STARTING",
@@ -351,11 +461,6 @@ def _render_instance_card(instance_id: str, config: dict):
                         "Start Shadow", icon="play_arrow",
                         on_click=lambda iid=instance_id: _start_instance(iid),
                     ).props("color=positive dense")
-
-            # Last bar price
-            lbp = st.get("last_bar_price")
-            if lbp and s in ("RUNNING", "STABILIZING"):
-                bars_lbl.text += f" | Last: ${lbp:,.2f}"
 
         ui.timer(2.0, _refresh)
         _refresh()

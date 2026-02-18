@@ -370,6 +370,18 @@ class MACDConfluenceStrategy:
 
     def snapshot(self) -> dict:
         """Return current state for status.json."""
+        # Build per-TF detail if bar counts are available
+        tf_detail = {}
+        bar_counts = getattr(self, "_tf_bar_counts", None)
+        for tf in self.timeframes:
+            macd = self.macd_by_tf[tf]
+            bars_processed = bar_counts.get(tf, 0) if bar_counts else 0
+            tf_detail[tf] = {
+                "bars_processed": bars_processed,
+                "required": REQUIRED_BARS_FOR_READY,
+                "ready": macd.ready,
+                "slope_sign": self.slope_sign_now.get(tf),
+            }
         return {
             "slope_signs": dict(self.slope_sign_now),
             "all_ready": self.all_ready(),
@@ -377,6 +389,7 @@ class MACDConfluenceStrategy:
             "intra_aligned": {tf: self.slope_sign_now.get(tf) for tf in self.intra_tfs},
             "entry_sign": self.slope_sign_now.get(self.entry_tf),
             "exit_sign": self.slope_sign_now.get(self.exit_tf),
+            "tf_detail": tf_detail,
         }
 
 
@@ -402,6 +415,7 @@ class PaperTracker:
     def __init__(self, round_trip_bps: float = 25.0, paper_qty: float = 0.001,
                  long_only: bool = False,
                  stop_loss_long_bps: int = 0, stop_loss_short_bps: int = 0):
+        self.round_trip_bps = round_trip_bps
         self.half_side_mult = (round_trip_bps / 2.0) / 10000.0
         self.paper_qty = paper_qty
         self.long_only = long_only
@@ -418,6 +432,9 @@ class PaperTracker:
         self.loss_count = 0
         self.total_trades = 0
         self.stop_loss_count = 0
+        self.entries_long = 0
+        self.entries_short = 0
+        self.exits_total = 0
 
     def force_flat(self, exit_price: float, reason: str):
         """Force-close any open position. Public API for gap exits and emergencies.
@@ -448,9 +465,11 @@ class PaperTracker:
         if self.position == 0:
             if signals.get("long_entry"):
                 self._open_position(1, mid_price)
+                self.entries_long += 1
                 action = "ENTRY_LONG"
             elif not self.long_only and signals.get("short_entry"):
                 self._open_position(-1, mid_price)
+                self.entries_short += 1
                 action = "ENTRY_SHORT"
 
         return action
@@ -512,6 +531,7 @@ class PaperTracker:
 
         self.total_pnl_bps += pnl_bps
         self.total_trades += 1
+        self.exits_total += 1
 
         if pnl_bps >= 0:
             self.win_count += 1
@@ -529,6 +549,7 @@ class PaperTracker:
         self._entry_mid = None
 
     def snapshot(self) -> dict:
+        avg_pnl = round(self.total_pnl_bps / self.total_trades, 2) if self.total_trades > 0 else 0.0
         return {
             "position": self.position,
             "entry_fill": self.entry_fill,
@@ -539,6 +560,11 @@ class PaperTracker:
             "total_trades": self.total_trades,
             "stop_loss_count": self.stop_loss_count,
             "win_rate": round(self.win_count / self.total_trades * 100, 1) if self.total_trades > 0 else 0.0,
+            "entries_long": self.entries_long,
+            "entries_short": self.entries_short,
+            "exits_total": self.exits_total,
+            "round_trip_bps": self.round_trip_bps,
+            "avg_pnl_per_trade_bps": avg_pnl,
         }
 
 
@@ -1092,6 +1118,8 @@ class ShadowDaemon:
         self.aggregator = BarAggregator(
             config["timeframes"], base_interval, self.strategy.on_tf_bar
         )
+        # Wire bar counts so strategy snapshot can report per-TF progress
+        self.strategy._tf_bar_counts = self.aggregator.tf_bar_counts
         self.tracker = PaperTracker(
             round_trip_bps=config.get("round_trip_bps", 25.0),
             paper_qty=config.get("paper_qty", 0.001),

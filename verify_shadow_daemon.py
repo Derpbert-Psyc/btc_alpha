@@ -405,6 +405,42 @@ def test_strategy_no_cross_no_entry():
     print("  PASS: No cross -> no entry triggered")
 
 
+def test_strategy_snapshot_tf_detail():
+    """snapshot() includes tf_detail with per-TF bars_processed/required/ready/slope_sign."""
+    from shadow_daemon import MACDConfluenceStrategy, Bar, BarAggregator, REQUIRED_BARS_FOR_READY
+
+    config = _make_test_strategy_config()
+    strat = MACDConfluenceStrategy(config)
+    agg = BarAggregator(config["timeframes"], 1, strat.on_tf_bar)
+    # Wire bar counts as ShadowDaemon.__init__ does
+    strat._tf_bar_counts = agg.tf_bar_counts
+
+    # Before any bars
+    snap = strat.snapshot()
+    assert "tf_detail" in snap, "snapshot must include tf_detail"
+    for tf in config["timeframes"]:
+        d = snap["tf_detail"][tf]
+        assert d["bars_processed"] == 0
+        assert d["required"] == REQUIRED_BARS_FOR_READY
+        assert d["ready"] is False
+        assert d["slope_sign"] is None
+
+    # Feed enough bars to warm up
+    for i in range(100):
+        agg.push_bar(Bar(ts=i, o=100+i*0.1, h=101+i*0.1,
+                         l=99+i*0.1, c=100+i*0.1, v=1))
+
+    snap = strat.snapshot()
+    for tf in config["timeframes"]:
+        d = snap["tf_detail"][tf]
+        assert d["bars_processed"] > 0, f"{tf} should have bars_processed > 0"
+        assert d["required"] == REQUIRED_BARS_FOR_READY
+        assert d["ready"] is True, f"{tf} should be ready after 100 bars"
+        assert d["slope_sign"] in (-1, 0, 1), f"{tf} slope_sign should be -1/0/+1"
+
+    print("  PASS: snapshot() includes tf_detail with correct fields")
+
+
 # =========================================================================
 # Checkpoint 6: PaperTracker
 # =========================================================================
@@ -522,6 +558,96 @@ def test_paper_tracker_long_only():
     assert tracker.position == 1
 
     print("  PASS: long_only suppresses short entries")
+
+
+def test_paper_tracker_enhanced_snapshot():
+    """snapshot() includes entries_long/short, exits_total, round_trip_bps, avg_pnl_per_trade_bps."""
+    from shadow_daemon import PaperTracker
+
+    tracker = PaperTracker(round_trip_bps=20.0)
+
+    # Empty state
+    snap = tracker.snapshot()
+    assert snap["entries_long"] == 0
+    assert snap["entries_short"] == 0
+    assert snap["exits_total"] == 0
+    assert snap["round_trip_bps"] == 20.0
+    assert snap["avg_pnl_per_trade_bps"] == 0.0
+
+    # Do a long entry + exit
+    tracker.process_signals(
+        {"long_entry": True, "short_entry": False, "exit_long": False, "exit_short": False},
+        100.0,
+    )
+    snap = tracker.snapshot()
+    assert snap["entries_long"] == 1
+    assert snap["entries_short"] == 0
+    assert snap["exits_total"] == 0
+
+    tracker.process_signals(
+        {"long_entry": False, "short_entry": False, "exit_long": True, "exit_short": False},
+        101.0,
+    )
+    snap = tracker.snapshot()
+    assert snap["entries_long"] == 1
+    assert snap["entries_short"] == 0
+    assert snap["exits_total"] == 1
+    assert snap["total_trades"] == 1
+    assert snap["avg_pnl_per_trade_bps"] == snap["total_pnl_bps"]  # 1 trade: avg == total
+
+    # Do a short entry + exit
+    tracker.process_signals(
+        {"long_entry": False, "short_entry": True, "exit_long": False, "exit_short": False},
+        101.0,
+    )
+    snap = tracker.snapshot()
+    assert snap["entries_long"] == 1
+    assert snap["entries_short"] == 1
+
+    tracker.process_signals(
+        {"long_entry": False, "short_entry": False, "exit_long": False, "exit_short": True},
+        100.0,
+    )
+    snap = tracker.snapshot()
+    assert snap["entries_short"] == 1
+    assert snap["exits_total"] == 2
+    assert snap["total_trades"] == 2
+    # avg_pnl_per_trade_bps = total_pnl_bps / 2
+    expected_avg = round(snap["total_pnl_bps"] / 2, 2)
+    assert snap["avg_pnl_per_trade_bps"] == expected_avg
+
+    print("  PASS: enhanced snapshot includes entries_long/short, exits_total, round_trip_bps, avg_pnl_per_trade_bps")
+
+
+def test_paper_tracker_exits_total_includes_stop_loss():
+    """exits_total incremented on stop-loss and force_flat too."""
+    from shadow_daemon import PaperTracker
+
+    tracker = PaperTracker(round_trip_bps=20.0, stop_loss_long_bps=100)
+
+    # Enter long
+    tracker.process_signals(
+        {"long_entry": True, "short_entry": False, "exit_long": False, "exit_short": False},
+        100.0,
+    )
+    assert tracker.entries_long == 1
+
+    # Stop loss hit
+    result = tracker.check_stop_loss(bar_low=98.0, bar_high=100.0, bar_close=98.5)
+    assert result == "STOP_LONG"
+    assert tracker.exits_total == 1
+    assert tracker.stop_loss_count == 1
+
+    # Enter long again, then force_flat
+    tracker.process_signals(
+        {"long_entry": True, "short_entry": False, "exit_long": False, "exit_short": False},
+        100.0,
+    )
+    assert tracker.entries_long == 2
+    tracker.force_flat(99.0, "TEST_FORCE_FLAT")
+    assert tracker.exits_total == 2
+
+    print("  PASS: exits_total incremented on stop_loss and force_flat")
 
 
 # =========================================================================
@@ -934,6 +1060,7 @@ def main():
         ("5.3 Strategy evaluate_exit", test_strategy_evaluate_exit),
         ("5.4 Strategy prev_entry_sign tracking", test_strategy_prev_entry_sign_tracking),
         ("5.5 Strategy no cross no entry", test_strategy_no_cross_no_entry),
+        ("5.6 Strategy snapshot tf_detail", test_strategy_snapshot_tf_detail),
 
         # Checkpoint 6: PaperTracker
         ("6.1 PaperTracker friction entry", test_paper_tracker_friction_entry),
@@ -942,6 +1069,8 @@ def main():
         ("6.4 PaperTracker stop-loss triggered", test_paper_tracker_stop_loss_triggered),
         ("6.5 PaperTracker stop-loss disabled", test_paper_tracker_stop_loss_disabled),
         ("6.6 PaperTracker long_only", test_paper_tracker_long_only),
+        ("6.7 PaperTracker enhanced snapshot", test_paper_tracker_enhanced_snapshot),
+        ("6.8 PaperTracker exits_total includes stop_loss", test_paper_tracker_exits_total_includes_stop_loss),
 
         # Checkpoint 7: Gap Detection
         ("7.1 Gap flag set", test_gap_detection_flag_set),
