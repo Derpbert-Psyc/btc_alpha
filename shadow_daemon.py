@@ -1069,7 +1069,7 @@ class ShadowDaemon:
         self.last_bar_price = None
         self._last_bar_epoch_ts = None
         self._shutdown = False
-        self._stabilization_end = None  # set in run() if stabilization_multiplier > 0
+        self._stabilization_end = None  # set in run() if stabilization_seconds > 0
         self._gap_flag = False           # True = gap detected, suppress trading
         self._gap_recovery_count = 0     # consecutive on-time bars since last gap
         self._expected_next_ts = None    # expected next base bar timestamp
@@ -1131,14 +1131,13 @@ class ShadowDaemon:
 
             # Phase 3: Begin streaming
             # Stabilization: suppress entries for configurable window (CX only by default)
-            stab_mult = self.config.get("stabilization_multiplier", 0)
-            max_tf_seconds = max(self.config["timeframes"].values())
+            stab_seconds = self.config.get("stabilization_seconds", 0)
             self._stabilization_end = None
 
-            if stab_mult > 0:
+            if stab_seconds > 0:
                 self.status = "STABILIZING"
-                self._stabilization_end = time.time() + (stab_mult * max_tf_seconds)
-                log.info(f"Stabilization window: {stab_mult * max_tf_seconds}s "
+                self._stabilization_end = time.time() + stab_seconds
+                log.info(f"Stabilization window: {stab_seconds}s "
                          f"(entries suppressed until {self._stabilization_end})")
             else:
                 self.status = "RUNNING"
@@ -1583,7 +1582,7 @@ if __name__ == "__main__":
 # # 1. Start a single instance
 # mkdir -p research/shadow_status/bybit-big/
 # cat > research/shadow_status/bybit-big/config.json << 'EOF'
-# {"instance_id":"bybit-big","exchange":"bybit","symbol":"BTCUSDT","category":"linear","strategy":"macd_big","base_interval_seconds":60,"timeframes":{"5m":300,"15m":900,"30m":1800,"1h":3600,"12h":43200,"1d":86400,"3d":259200},"roles":{"macro":["3d","1d","12h"],"intra":["1h","30m","15m"],"entry":"5m","exit":"1d"},"long_only":false,"macd_fast":12,"macd_slow":26,"round_trip_bps":25.0,"paper_qty":0.001,"stabilization_multiplier":0}
+# {"instance_id":"bybit-big","exchange":"bybit","symbol":"BTCUSDT","category":"linear","strategy":"macd_big","base_interval_seconds":60,"timeframes":{"5m":300,"15m":900,"30m":1800,"1h":3600,"12h":43200,"1d":86400,"3d":259200},"roles":{"macro":["3d","1d","12h"],"intra":["1h","30m","15m"],"entry":"5m","exit":"1d"},"long_only":false,"macd_fast":12,"macd_slow":26,"round_trip_bps":25.0,"paper_qty":0.001,"stabilization_seconds":0}
 # EOF
 # python3 shadow_daemon.py --instance-id bybit-big &
 #

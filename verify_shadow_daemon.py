@@ -547,7 +547,7 @@ def test_gap_detection_flag_set():
         "macd_slow": 26,
         "round_trip_bps": 25.0,
         "paper_qty": 0.001,
-        "stabilization_multiplier": 0,
+        "stabilization_seconds": 0,
         "gap_recovery_bars": 5,
     }
 
@@ -591,7 +591,7 @@ def test_gap_suppresses_signals():
         "macd_slow": 26,
         "round_trip_bps": 25.0,
         "paper_qty": 0.001,
-        "stabilization_multiplier": 0,
+        "stabilization_seconds": 0,
         "gap_recovery_bars": 5,
     }
 
@@ -630,7 +630,7 @@ def test_gap_stop_loss_active():
         "macd_slow": 26,
         "round_trip_bps": 25.0,
         "paper_qty": 0.001,
-        "stabilization_multiplier": 0,
+        "stabilization_seconds": 0,
         "stop_loss_long_bps": 500,
         "gap_recovery_bars": 5,
     }
@@ -670,7 +670,7 @@ def test_gap_recovery():
         "macd_slow": 26,
         "round_trip_bps": 25.0,
         "paper_qty": 0.001,
-        "stabilization_multiplier": 0,
+        "stabilization_seconds": 0,
         "gap_recovery_bars": 5,
     }
 
@@ -715,7 +715,7 @@ def test_gap_force_flat():
         "macd_slow": 26,
         "round_trip_bps": 25.0,
         "paper_qty": 0.001,
-        "stabilization_multiplier": 0,
+        "stabilization_seconds": 0,
         "gap_recovery_bars": 5,
     }
 
@@ -825,15 +825,14 @@ def test_stabilization_suppresses_entries():
         "macd_slow": 26,
         "round_trip_bps": 25.0,
         "paper_qty": 0.001,
-        "stabilization_multiplier": 2,
+        "stabilization_seconds": 20,
         "gap_recovery_bars": 5,
     }
 
     daemon = ShadowDaemon("test-stab", config)
 
     # Simulate that warm-up is done and we're in stabilization
-    max_tf = max(config["timeframes"].values())
-    stab_window = config["stabilization_multiplier"] * max_tf  # 2 * 10 = 20s
+    stab_window = config["stabilization_seconds"]  # 20s
     daemon.status = "STABILIZING"
     daemon._stabilization_end = time.time() + stab_window
 
@@ -875,7 +874,7 @@ def test_stabilization_exit_not_suppressed():
         "macd_slow": 26,
         "round_trip_bps": 25.0,
         "paper_qty": 0.001,
-        "stabilization_multiplier": 2,
+        "stabilization_seconds": 100,
         "stop_loss_long_bps": 500,
         "gap_recovery_bars": 5,
     }
