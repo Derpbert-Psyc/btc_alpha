@@ -271,7 +271,7 @@ stop_loss_resolved:
 
 The strategy-authoring bps fields do not appear in the resolved config. This lowering is part of the normative lowering pipeline (§11).
 
-**Stop loss validation (NORMATIVE):** `value_long_bps` and `value_short_bps` MUST be non-null integers in [100, 2000] for SHADOW/LIVE promotion. For RESEARCH mode with `warmup_restart_policy = "HARD_STOPS"`, they MUST also be non-null integers. For RESEARCH mode with `warmup_restart_policy = "FLATTEN"`, they MAY be null (stop loss disabled for signal-quality research). The engine MUST reject configs with null stop loss values for any mode that permits position opening without valid stops, with error code `stop_loss_undefined`.
+**Stop loss validation (NORMATIVE):** `value_long_bps` and `value_short_bps` MAY be null (stop loss disabled) in ALL modes including SHADOW and LIVE. When non-null, values MUST be integers in [100, 2000]. The system owner may enable or disable stop-loss per strategy based on research findings — this is a tunable parameter, not a promotion gate. For any mode with `warmup_restart_policy = "HARD_STOPS"` and non-null stop loss values, the engine validates the range [100, 2000]. When stop loss is null (disabled), the engine MUST NOT reject the config and MUST NOT require stop loss for mode promotion.
 
 ### 4.4 MTM Drawdown Exit (OPTIONAL)
 
@@ -849,7 +849,7 @@ The JSON below is the authoring form. It contains role_conditions, DERIVED: fiel
 1. Every indicator label referenced in entry_rules or exit_rules MUST exist in indicator_instances.
 2. Indicator instance count MUST satisfy §2.4 (min/max per group).
 3. Unknown fields MUST cause a validation error (strict schema).
-4. `stop_loss.value_long_bps` and `value_short_bps` MUST be non-null integers in [100, 2000] for SHADOW/LIVE promotion, and non-null if `warmup_restart_policy = "HARD_STOPS"` in any mode.
+4. `stop_loss.value_long_bps` and `value_short_bps` MAY be null (stop loss disabled) in ALL modes including SHADOW and LIVE. When non-null, values MUST be integers in [100, 2000]. When `warmup_restart_policy = "HARD_STOPS"` and non-null, the range [100, 2000] is enforced.
 5. `spot_capabilities` MUST be non-null for variant="spot".
 6. **Feature disable semantics (NORMATIVE):** The `enabled` field is the authoritative disable mechanism for optional features (mtm_drawdown_exit, time_limit, funding_exit). When `enabled: false`, all associated parameter fields MAY be null. When `enabled: true`, all required parameter fields MUST be non-null (validation error otherwise). The loader MUST NOT infer enabled/disabled from null parameters alone — only the `enabled` field controls this. Features without an `enabled` field (stop_loss, signal exits) are always active when their required parameters are non-null.
 7. All timeframe strings MUST match the canonical enum (§2.3).

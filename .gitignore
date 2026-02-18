@@ -48,3 +48,7 @@ oscillation_lab/
 
 # API keys / secrets
 config/api_keys.json
+
+# Shadow daemon runtime state
+research/shadow_status/
+research/pod_status/shadow_*/
